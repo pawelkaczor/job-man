@@ -16,18 +16,28 @@ licenses          in ThisBuild := ("MIT", new URL("http://raw.githubusercontent.
 sonatypeProfileName := "pl.newicom"
 
 lazy val root = (project in file("."))
-  .aggregate(`job-man-core`)
+  .aggregate(`job-man-api`, `job-scheduling-policy`, `job-man-core`)
   .settings(
     commonSettings,
     publishArtifact := false
   )
 
 
+lazy val `job-man-api` = project
+  .settings(
+    commonSettings
+  )
+
+lazy val `job-scheduling-policy` = project
+  .settings(
+    commonSettings,
+  ).dependsOn(`job-man-api`)
+
 lazy val `job-man-core` = project
   .settings(
     commonSettings,
     libraryDependencies ++= Seq(Akka.actor, scalaTest % "test")
-  )
+  ).dependsOn(`job-scheduling-policy`)
 
 
 lazy val commonSettings: Seq[Setting[_]] = Publish.settings ++ Seq(
