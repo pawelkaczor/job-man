@@ -20,10 +20,12 @@ object Deps {
 
   object Akka {
     val actor            = apply("actor")
+    val actorTyped       = apply("actor-typed")
     val clusterTools     = apply("cluster-tools")
     val clusterSharding  = apply("cluster-sharding")
     val multiNodeTestkit = apply("multi-node-testkit")
     val persistence      = apply("persistence")
+    val persistenceTyped = apply("persistence-typed")
     val persistenceQuery = apply("persistence-query")
     val slf4j            = apply("slf4j")
     val stream           = apply("stream")

@@ -9,6 +9,8 @@ version      in ThisBuild := "0.5.0-SNAPSHOT"
 organization in ThisBuild := "pl.newicom.jobman"
 scalaVersion in ThisBuild := "2.12.7"
 
+scalacOptions     in ThisBuild := Seq("-encoding", "utf8", "-deprecation", "-feature", "-language:postfixOps", "-language:implicitConversions", "-unchecked")
+
 publishMavenStyle in ThisBuild := true
 homepage          in ThisBuild := Some(new URL("http://github.com/pawelkaczor/job-man"))
 licenses          in ThisBuild := ("MIT", new URL("http://raw.githubusercontent.com/pawelkaczor/job-man/master/LICENSE.md")) :: Nil
@@ -21,7 +23,6 @@ lazy val root = (project in file("."))
     commonSettings,
     publishArtifact := false
   )
-
 
 lazy val `job-man-api` = project
   .settings(
@@ -36,7 +37,7 @@ lazy val `job-scheduling-policy` = project
 lazy val `job-man-core` = project
   .settings(
     commonSettings,
-    libraryDependencies ++= Seq(Akka.actor, scalaTest % "test")
+    libraryDependencies ++= Seq(Akka.persistenceTyped, scalaTest % "test")
   ).dependsOn(`job-scheduling-policy`)
 
 

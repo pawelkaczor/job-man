@@ -12,6 +12,8 @@ case class JobAlreadyDispatchedForExecution(jobId: String) extends JobCancellati
 case class JobCanceled(jobId: String, queueId: Option[Int], position: Int) extends JobCancellationResult with JobSchedulingResult
 case class EquivalentJobFound(jobId: String, equivalentJobId: String) extends JobSchedulingResult
 
+case class JobDispatchedForExecution(job: Job, queueId: Int) extends JobScheduleEvent
+
 case class JobNotFound(jobId: String) extends JobCancellationResult
 
 case class JobScheduleEntryAdded(job: Job, queueId: Int, position: Int) extends JobSchedulingResult {

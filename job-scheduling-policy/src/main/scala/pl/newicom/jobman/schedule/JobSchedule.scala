@@ -2,7 +2,7 @@ package pl.newicom.jobman.schedule
 
 import pl.newicom.jobman.schedule.JobSchedule._
 import pl.newicom.jobman.schedule.event.{EquivalentJobFound, JobAddedToWaitingList, JobScheduleEntryAdded, JobSchedulingResult}
-import pl.newicom.jobman.{Job, JobParameters, JobType, JobTypeRegistry}
+import pl.newicom.jobman.{Job, JobParameters, JobType, JobConfigRegistry}
 
 import scala.util.Try
 
@@ -10,7 +10,9 @@ object JobSchedule {
 
   type ParamsPredicate[T <: JobParameters] = (T, T) => Boolean
 
-  case class Entry(jobId: String, params: JobParameters, queueId: Int)
+  case class Entry(jobId: String, params: JobParameters, queueId: Int) {
+    def job: Job = Job(jobId, params)
+  }
 
   trait State {
     def queues: Map[Int, List[Entry]]
@@ -28,6 +30,9 @@ object JobSchedule {
 
     def waitingList: List[Job] =
       state.waitingList
+
+    def entry(jobId: String): Option[Entry] =
+      entries(_.jobId == jobId).headOption
 
     def entries(queueId: Int): List[Entry] =
       queues(queueId)
@@ -58,17 +63,17 @@ object JobSchedule {
   }
 
   trait JobTypeRegistryQueries {
-    def jobTypeRegistry: JobTypeRegistry
+    def jobConfigRegistry: JobConfigRegistry
 
     def jobType(entry: Entry): JobType =
-      jobTypeRegistry.jobType(entry.params)
+      jobConfigRegistry.jobType(entry.params)
 
     def jobType(job: Job): JobType =
-      jobTypeRegistry.jobType(job.params)
+      jobConfigRegistry.jobType(job.params)
   }
 }
 
-case class JobSchedule(state: State, config: JobSchedulingConfig, jobTypeRegistry: JobTypeRegistry) extends StateQueries with JobTypeRegistryQueries {
+case class JobSchedule(state: State, config: JobSchedulingConfig, jobConfigRegistry: JobConfigRegistry) extends StateQueries with JobTypeRegistryQueries {
 
   def enqueueDefault(job: Job): JobSchedulingResult =
     Try {
@@ -85,15 +90,15 @@ case class JobSchedule(state: State, config: JobSchedulingConfig, jobTypeRegistr
     }.get
 
   private def enqueueInNewQueue(job: Job): JobSchedulingResult =
-    JobScheduleEntryAdded(job, this.nextQueueId, 0)
+      JobScheduleEntryAdded(job, this.nextQueueId, 0)
 
-  def enqueueLast(job: Job, queueId: Integer): JobSchedulingResult =
+  def enqueueLast(job: Job, queueId: Int): JobSchedulingResult =
       JobScheduleEntryAdded(job, queueId, queueLength(queueId))
 
-  def enqueueBefore(job: Job, queueId: Integer, dependentJobId: String): JobScheduleEntryAdded =
+  def enqueueBefore(job: Job, queueId: Int, dependentJobId: String): JobScheduleEntryAdded =
     entries(queueId)
       .zipWithIndex
-      .find(_._1 == dependentJobId)
+      .find(_._1.jobId == dependentJobId)
       .map(p => JobScheduleEntryAdded(job, queueId, p._2))
       .get
 
