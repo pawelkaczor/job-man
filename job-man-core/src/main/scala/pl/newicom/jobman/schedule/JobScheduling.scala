@@ -1,31 +1,76 @@
 package pl.newicom.jobman.schedule
 
-import akka.actor.typed.scaladsl.ActorContext
-import akka.persistence.typed.scaladsl.Effect
+import akka.NotUsed
+import akka.actor.typed.Behavior
+import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
+import akka.persistence.typed.scaladsl.{Effect, PersistentBehaviors}
+import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.typed.scaladsl.ActorSink
+import pl.newicom.jobman._
+import pl.newicom.jobman.execution.event.JobExecutionTerminalEvent
 import pl.newicom.jobman.schedule.JobScheduling.EventHandler
 import pl.newicom.jobman.schedule.command.{CancelJob, JobScheduleCommand, ScheduleJob}
 import pl.newicom.jobman.schedule.event._
 import pl.newicom.jobman.shared.command._
 import pl.newicom.jobman.shared.event.ExecutionJournalOffsetChanged
-import pl.newicom.jobman.{CommandHandler, Job}
 
 object JobScheduling {
 
+  val JobSchedulingJournalId = "JobSchedule"
+
+  def behavior(policy: JobSchedulingPolicy, config: JobSchedulingConfig)(implicit jm: JobMan): Behavior[JobScheduleCommand] =
+    Behaviors.setup(ctx => {
+      PersistentBehaviors.receive(
+        persistenceId = JobSchedulingJournalId,
+        emptyState = JobScheduleState(),
+        commandHandler = new JobSchedulingCommandHandler(ctx, policy, config, eventHandler),
+        eventHandler
+      ).onRecoveryCompleted { schedule =>
+        ctx.log.info("Job Scheduling resumed from executionJournalOffset: {}", schedule.executionJournalOffset)
+
+        def reactToJobTerminalEvent(reaction: (JobExecutionTerminalEvent, Long) => JobScheduleCommand) = {
+          val source: Source[JobScheduleCommand, NotUsed] = jm.readJournal
+            .eventsByPersistenceId(JobSchedulingJournalId, schedule.executionJournalOffset, Long.MaxValue)
+            .filter(envelope => envelope.event.isInstanceOf[JobExecutionTerminalEvent])
+            .map(envelope => reaction(envelope.event.asInstanceOf[JobExecutionTerminalEvent], envelope.sequenceNr))
+
+          val sink: Sink[JobScheduleCommand, NotUsed] = ActorSink.actorRef(ctx.self, Stop, StopDueToEventSubsriptionTermination.apply)
+
+          source.runWith(sink)(jm.actorMaterializer("Job Scheduling service failure"))
+        }
+
+        reactToJobTerminalEvent((event, offset) => event match {
+          case execution.event.JobExpired(jobId, followUp, _) =>
+            JobExpirationReport(jobId, followUp, offset)
+
+          case e: execution.event.JobEnded =>
+            JobExecutionReport(SuccessfulJobResult(e.jobId), offset)
+
+          case e: execution.event.JobTerminated =>
+            JobTerminationReport(e.jobId, e.followUp, offset)
+
+        })
+      }.snapshotEvery(jm.config.journalSnapshotInterval)
+    })
+
   type EventHandler = (JobScheduleState, JobScheduleEvent) => JobScheduleState
 
-  val eventHandler: EventHandler = {
+  private val eventHandler: EventHandler = {
     case (s, e) => s.apply(e)
   }
 
+  case class SuccessfulJobResult(jobId: String) extends JobResult {
+    override def isSuccess: Boolean = true
+    override def jobType: JobType = ???
+    override def report: String = "OK"
+  }
 }
 
 class JobSchedulingCommandHandler(ctx: ActorContext[JobScheduleCommand],
                                    schedulingPolicy: JobSchedulingPolicy,
                                    config: JobSchedulingConfig,
                                    eventHandler: EventHandler)
-  extends CommandHandler[JobScheduleCommand, JobScheduleEvent, JobScheduleState](ctx, eventHandler) {
-
-  type ScheduleEntry = JobSchedule.Entry
+  extends EventSourcedCommandHandler[JobScheduleCommand, JobScheduleEvent, JobScheduleState](ctx, eventHandler) {
 
   def apply(schedule: State, command: Command): Effect[Event, State] = command match {
 
@@ -102,7 +147,7 @@ class JobSchedulingCommandHandler(ctx: ActorContext[JobScheduleCommand],
       }
     }).toList.flatten
 
-  def jobDispatchedForExecution(entry: Option[ScheduleEntry]): List[Event] =
+  def jobDispatchedForExecution(entry: Option[JobSchedule.Entry]): List[Event] =
     entry.map(e => JobDispatchedForExecution(e.job, e.queueId)).toList
 
   def withOffsetChanged(cmd: HasExecutionJournalOffset, events: List[Event]): List[Event] =

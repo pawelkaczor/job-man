@@ -29,6 +29,7 @@ object Deps {
     val persistenceQuery = apply("persistence-query")
     val slf4j            = apply("slf4j")
     val stream           = apply("stream")
+    val streamTyped      = apply("stream-typed")
     val testkit          = apply("testkit")
 
     private def apply(moduleName: String) = "com.typesafe.akka" %% s"akka-$moduleName" % Version.Akka
