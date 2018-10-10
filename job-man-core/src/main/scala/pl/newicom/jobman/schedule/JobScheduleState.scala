@@ -8,7 +8,9 @@ import pl.newicom.jobman.utils._
 
 case class JobScheduleState(override val queues: Map[Int, List[Entry]] = Map.empty,
                             override val waitingList: List[Job] = List.empty,
-                             executionJournalOffset: Long = 1L) extends JobSchedule.State with JobSchedule.StateQueries {
+                            executionJournalOffset: Long = 1L)
+    extends JobSchedule.State
+    with JobSchedule.StateQueries {
 
   def state: JobSchedule.State = this
 
@@ -23,16 +25,19 @@ case class JobScheduleState(override val queues: Map[Int, List[Entry]] = Map.emp
       copy(waitingList = waitingList.:+(job))
 
     case JobCanceled(_, queueIdOpt, pos) =>
-      queueIdOpt.map(queueId =>
-        copy(queues = queues.minus(queueId, pos))
-      ).getOrElse {
-        copy(waitingList = waitingList.drop(pos))
-      }
+      queueIdOpt
+        .map(queueId => copy(queues = queues.minus(queueId, pos)))
+        .getOrElse {
+          copy(waitingList = waitingList.drop(pos))
+        }
 
     case JobEnded(jobId) =>
-      dispatchedJobs.find(_.jobId == jobId).map(e => {
-        copy(queues = queues.minus(e.queueId, e))
-      }).getOrElse(this)
+      dispatchedJobs
+        .find(_.jobId == jobId)
+        .map(e => {
+          copy(queues = queues.minus(e.queueId, e))
+        })
+        .getOrElse(this)
 
     case ExecutionJournalOffsetChanged(newOffsetValue) =>
       copy(executionJournalOffset = newOffsetValue)
@@ -42,7 +47,7 @@ case class JobScheduleState(override val queues: Map[Int, List[Entry]] = Map.emp
 
   def successorJob(jobId: String): Option[Entry] =
     queueId(jobId).flatMap(queueId => {
-      val es = entries(queueId)
+      val es    = entries(queueId)
       val pairs = es.:+(null).zip(null :: es.tail)
       pairs
         .find { case (l, _) => Option(l).exists(_.jobId == jobId) }

@@ -8,9 +8,9 @@ sealed trait JobSchedulingResult extends JobScheduleEvent
 
 sealed trait JobCancellationResult
 
-case class JobAlreadyDispatchedForExecution(jobId: String) extends JobCancellationResult
+case class JobAlreadyDispatchedForExecution(jobId: String)                 extends JobCancellationResult
 case class JobCanceled(jobId: String, queueId: Option[Int], position: Int) extends JobCancellationResult with JobSchedulingResult
-case class EquivalentJobFound(jobId: String, equivalentJobId: String) extends JobSchedulingResult
+case class EquivalentJobFound(jobId: String, equivalentJobId: String)      extends JobSchedulingResult
 
 case class JobDispatchedForExecution(job: Job, queueId: Int) extends JobScheduleEvent
 

@@ -3,6 +3,8 @@ import Deps.TestFrameworks.{scalaTest, _}
 import sbt.Keys._
 import java.net.URL
 
+import org.scalafmt.sbt.ScalafmtPlugin.autoImport.scalafmtOnCompile
+
 name := "job-man"
 
 version      in ThisBuild := "0.5.0-SNAPSHOT"
@@ -44,5 +46,6 @@ lazy val `job-man-core` = project
 lazy val commonSettings: Seq[Setting[_]] = Publish.settings ++ Seq(
   licenses := Seq("MIT" -> url("http://raw.github.com/pawelkaczor/job-man/master/LICENSE.md")),
   startYear := Some(2018),
-  publishTo := Some(if (isSnapshot.value) Opts.resolver.sonatypeSnapshots else Opts.resolver.sonatypeStaging)
+  publishTo := Some(if (isSnapshot.value) Opts.resolver.sonatypeSnapshots else Opts.resolver.sonatypeStaging),
+  scalafmtOnCompile := true
 )

@@ -14,12 +14,14 @@ object JobManInfraServices {
 
 class JobManInfraServices(implicit actorSystem: ActorSystem[Void]) extends JobMan {
 
-
   def actorMaterializer(errorMsg: String): ActorMaterializer = {
-    scaladsl.ActorMaterializer(Some(ActorMaterializerSettings(actorSystem.toUntyped).withSupervisionStrategy(ex => {
-      log.error(errorMsg, ex)
-      Supervision.stop
-    })))
+    scaladsl.ActorMaterializer(
+      Some(
+        ActorMaterializerSettings(actorSystem.toUntyped)
+          .withSupervisionStrategy(ex => {
+            log.error(errorMsg, ex)
+            Supervision.stop
+          })))
   }
 
   def readJournal: EventsByPersistenceIdQuery = ???

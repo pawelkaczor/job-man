@@ -10,10 +10,10 @@ import pl.newicom.jobman.shared.event.SubscriptionOffsetChangedEvent
 
 abstract class EventSourcedCommandHandler[C, E, S](ctx: ActorContext[C], eventHandler: (S, E) => S) extends CommandHandler[C, E, S] {
   type Command = C
-  type Event = E
-  type State = S
+  type Event   = E
+  type State   = S
 
-  type EventHandler = (State, Event) ⇒ State
+  type EventHandler   = (State, Event) ⇒ State
   type CommandHandler = (State, Command) ⇒ Effect[Event, State]
 
   case class Event2Persist[EE <: E](event: EE, callback: EE => Unit = (_: EE) => ()) {
@@ -21,7 +21,8 @@ abstract class EventSourcedCommandHandler[C, E, S](ctx: ActorContext[C], eventHa
   }
 
   case class Events2Persist[EE <: E](events: List[EE], callback: EE => Unit = (_: EE) => ()) {
-    def thenRun(c: PartialFunction[EE,Unit]): Effect[E, S] = toEffect(copy(callback = (e: EE) => c.applyOrElse(e, callback)))
+    def thenRun(c: PartialFunction[EE, Unit]): Effect[E, S] =
+      toEffect(copy(callback = (e: EE) => c.applyOrElse(e, callback)))
   }
 
   implicit def toEffect[EE <: E](event: Event2Persist[EE]): Effect[E, S] =
@@ -37,10 +38,13 @@ abstract class EventSourcedCommandHandler[C, E, S](ctx: ActorContext[C], eventHa
     Events2Persist(events)
 
   private def persistEffect[EE <: E](events: List[EE])(callback: EE => Unit): Effect[E, State] =
-    Effect.persist(events).thenRun(_ => events.foreach(e => {
-        callback(e)
-        logEvent(e)
-      }))
+    Effect
+      .persist(events)
+      .thenRun(_ =>
+        events.foreach(e => {
+          callback(e)
+          logEvent(e)
+        }))
 
   protected def noStateChanges: EventHandler =
     (s: State, _: Event) => s
@@ -64,6 +68,5 @@ abstract class EventSourcedCommandHandler[C, E, S](ctx: ActorContext[C], eventHa
     val packageName = getClass.getPackage.getName
     packageName.substring(packageName.lastIndexOf(".") + 1)
   }
-
 
 }

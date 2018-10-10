@@ -54,8 +54,10 @@ object JobSchedule {
 
     def queueWithTheLowestNrOfEnqueuedJobs: Option[Int] =
       queues
-        .map { case (qId, es) => (qId, es.size)}
-        .toSeq.sortBy(_._2).map(_._1)
+        .map { case (qId, es) => (qId, es.size) }
+        .toSeq
+        .sortBy(_._2)
+        .map(_._1)
         .headOption
 
     def awaitingJob(jobId: String): Option[Job] =
@@ -76,7 +78,9 @@ object JobSchedule {
   }
 }
 
-case class JobSchedule(state: State, config: JobSchedulingConfig, jobConfigRegistry: JobConfigRegistry) extends StateQueries with JobTypeRegistryQueries {
+case class JobSchedule(state: State, config: JobSchedulingConfig, jobConfigRegistry: JobConfigRegistry)
+    extends StateQueries
+    with JobTypeRegistryQueries {
 
   def enqueueDefault(job: Job): JobSchedulingResult =
     Try {
@@ -89,18 +93,18 @@ case class JobSchedule(state: State, config: JobSchedulingConfig, jobConfigRegis
           .getOrElse(enqueueInNewQueue(job))
       }
     }.recover {
-      case _: JobSchedulingException => copy(config = config.withQueueCapacityBumped).enqueueDefault(job)
+      case _: JobSchedulingException =>
+        copy(config = config.withQueueCapacityBumped).enqueueDefault(job)
     }.get
 
   private def enqueueInNewQueue(job: Job): JobSchedulingResult =
-      JobScheduleEntryAdded(job, this.nextQueueId, 0)
+    JobScheduleEntryAdded(job, this.nextQueueId, 0)
 
   def enqueueLast(job: Job, queueId: Int): JobSchedulingResult =
-      JobScheduleEntryAdded(job, queueId, queueLength(queueId))
+    JobScheduleEntryAdded(job, queueId, queueLength(queueId))
 
   def enqueueBefore(job: Job, queueId: Int, dependentJobId: String): JobScheduleEntryAdded =
-    entries(queueId)
-      .zipWithIndex
+    entries(queueId).zipWithIndex
       .find(_._1.jobId == dependentJobId)
       .map(p => JobScheduleEntryAdded(job, queueId, p._2))
       .get
@@ -112,7 +116,8 @@ case class JobSchedule(state: State, config: JobSchedulingConfig, jobConfigRegis
 
   @SafeVarargs
   def enqueueAfter(job: Job, predicates: ParamsPredicate[JobParameters]*): Option[JobSchedulingResult] = {
-    val entryPredicates = predicates.map(p => (e: Entry) => p(job.params, e.params))
+    val entryPredicates =
+      predicates.map(p => (e: Entry) => p(job.params, e.params))
 
     val results = entryPredicates.flatMap(p => enqueueAfter(job, p).toList)
     if (results.isEmpty)
@@ -124,7 +129,8 @@ case class JobSchedule(state: State, config: JobSchedulingConfig, jobConfigRegis
         val queues: Set[Int] = results
           .filter(_.isInstanceOf[JobScheduleEntryAdded])
           .map(_.asInstanceOf[JobScheduleEntryAdded])
-          .groupBy(_.queueId).keySet
+          .groupBy(_.queueId)
+          .keySet
 
         enqueueLast(job, queues)
       }
@@ -144,10 +150,8 @@ case class JobSchedule(state: State, config: JobSchedulingConfig, jobConfigRegis
     enqueueLast(job, entries(entryPredicate).groupBy(_.queueId).keySet)
 
   def rejectIfEquivalentJobEnqueued(job: Job): Option[JobSchedulingResult] =
-    entries(e => jobType(e) == jobType(job) && (e.jobId == job.id || e.params == job.params))
-      .headOption
+    entries(e => jobType(e) == jobType(job) && (e.jobId == job.id || e.params == job.params)).headOption
       .map(e => EquivalentJobFound(job.id, e.jobId))
-
 
   private def nextQueueId: Int =
     emptyQueues.keys.headOption.getOrElse {
@@ -156,10 +160,6 @@ case class JobSchedule(state: State, config: JobSchedulingConfig, jobConfigRegis
         qNum + 1
       else
         throw new JobSchedulingException("Maximum number of queues reached.")
-  }
-
+    }
 
 }
-
-
-

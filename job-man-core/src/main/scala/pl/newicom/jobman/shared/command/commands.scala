@@ -12,10 +12,13 @@ case class JobExecutionReport(result: JobResult, executionJournalOffset: Long) e
   def jobId: String = result.jobId
 }
 
-case class JobExpirationReport(jobId: String, followUp: String, executionJournalOffset: Long) extends JobScheduleCommand with HasExecutionJournalOffset
+case class JobExpirationReport(jobId: String, followUp: String, executionJournalOffset: Long)
+    extends JobScheduleCommand
+    with HasExecutionJournalOffset
 
-case class JobTerminationReport(jobId: String, followUp: String, executionJournalOffset: Long) extends JobScheduleCommand with HasExecutionJournalOffset
-
+case class JobTerminationReport(jobId: String, followUp: String, executionJournalOffset: Long)
+    extends JobScheduleCommand
+    with HasExecutionJournalOffset
 
 case object Stop extends JobScheduleCommand
 

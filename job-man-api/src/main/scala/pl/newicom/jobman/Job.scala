@@ -7,11 +7,10 @@ case class Job(id: String, params: JobParameters) {
   override def equals(that: Any): Boolean =
     that match {
       case that: Job => that.canEqual(this) && this.hashCode == that.hashCode
-      case _ => false
+      case _         => false
     }
 
-
-  override def hashCode:Int = {
-    31  + id.hashCode
+  override def hashCode: Int = {
+    31 + id.hashCode
   }
 }
