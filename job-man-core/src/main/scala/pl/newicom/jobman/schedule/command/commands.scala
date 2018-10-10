@@ -5,6 +5,8 @@ import akka.actor.typed.scaladsl.adapter._
 import pl.newicom.jobman.Job
 import pl.newicom.jobman.schedule.event.{JobCancellationResult, JobSchedulingResult}
 
+trait JobScheduleCommand
+
 case class ScheduleJob(job: Job, replyToUntyped: ActorRef) extends JobScheduleCommand {
 
   def replyTo: akka.actor.typed.ActorRef[JobSchedulingResult] =

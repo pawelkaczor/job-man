@@ -5,7 +5,8 @@ import akka.persistence.typed.scaladsl.Effect
 import pl.newicom.jobman.schedule.JobScheduling.EventHandler
 import pl.newicom.jobman.schedule.command.{CancelJob, JobScheduleCommand, ScheduleJob}
 import pl.newicom.jobman.schedule.event._
-import pl.newicom.jobman.shared.command.JobExecutionReport
+import pl.newicom.jobman.shared.command._
+import pl.newicom.jobman.shared.event.ExecutionJournalOffsetChanged
 import pl.newicom.jobman.{CommandHandler, Job}
 
 object JobScheduling {
@@ -25,9 +26,6 @@ class JobSchedulingCommandHandler(ctx: ActorContext[JobScheduleCommand],
   extends CommandHandler[JobScheduleCommand, JobScheduleEvent, JobScheduleState](ctx, eventHandler) {
 
   type ScheduleEntry = JobSchedule.Entry
-
-  implicit def state2Schedule(state: JobScheduleState): JobSchedule =
-    JobSchedule(state, config, null)
 
   def apply(schedule: State, command: Command): Effect[Event, State] = command match {
 
@@ -55,8 +53,15 @@ class JobSchedulingCommandHandler(ctx: ActorContext[JobScheduleCommand],
           .getOrElse(Effect.none)
       }
 
-    case JobExecutionReport(result, executionJournalOffset) =>
-      Effect.none
+    case cmd: JobExecutionReport =>
+      persist(withOffsetChanged(cmd, jobEntryRemoved(schedule, cmd.jobId)))
+
+    case cmd @ JobTerminationReport(jobId, followUp, _) =>
+      persist(withOffsetChanged(cmd, jobTerminated(schedule, jobId, followUp)))
+
+    case cmd @ (Stop | StopDueToEventSubsriptionTermination(_)) =>
+      logger.info("{} received. Stopping Job Scheduling. Number of jobs in the schedule {}", cmd, schedule.jobsNumber)
+      Effect.stop
   }
 
   def jobScheduled(schedule: State, job: Job): List[Event] =
@@ -100,5 +105,10 @@ class JobSchedulingCommandHandler(ctx: ActorContext[JobScheduleCommand],
   def jobDispatchedForExecution(entry: Option[ScheduleEntry]): List[Event] =
     entry.map(e => JobDispatchedForExecution(e.job, e.queueId)).toList
 
+  def withOffsetChanged(cmd: HasExecutionJournalOffset, events: List[Event]): List[Event] =
+    events.+:(ExecutionJournalOffsetChanged(cmd.executionJournalOffset + 1))
+
+  private implicit def state2Schedule(state: JobScheduleState): JobSchedule =
+    JobSchedule(state, config, null)
 
 }

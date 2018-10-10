@@ -1,5 +1,6 @@
 package pl.newicom.jobman
 
+import akka.actor.typed.Logger
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.typed.scaladsl.ActorContext
 import akka.event.Logging
@@ -23,10 +24,10 @@ abstract class CommandHandler[C, E, S](ctx: ActorContext[C], eventHandler: (S, E
   }
 
   implicit def toEffect[EE <: E](event: Event2Persist[EE]): Effect[E, S] =
-    persistInternal(List(event.event))(event.callback)
+    persistEffect(List(event.event))(event.callback)
 
   implicit def toEffect[EE <: E](events: Events2Persist[EE]): Effect[E, S] =
-    persistInternal(events.events)(events.callback)
+    persistEffect(events.events)(events.callback)
 
   protected def persist[EE <: E](event: EE): Event2Persist[EE] =
     Event2Persist(event)
@@ -34,7 +35,7 @@ abstract class CommandHandler[C, E, S](ctx: ActorContext[C], eventHandler: (S, E
   protected def persist[EE <: E](events: List[EE]): Events2Persist[EE] =
     Events2Persist(events)
 
-  protected def persistInternal[EE <: E](events: List[EE])(callback: EE => Unit): Effect[E, State] =
+  private def persistEffect[EE <: E](events: List[EE])(callback: EE => Unit): Effect[E, State] =
     Effect.persist(events).thenRun(_ => events.foreach(e => {
         callback(e)
         logEvent(e)
@@ -55,6 +56,8 @@ abstract class CommandHandler[C, E, S](ctx: ActorContext[C], eventHandler: (S, E
   }
 
   private def journalLogger = Logging.getLogger(ctx.system.toUntyped, "journal")
+
+  def logger: Logger = ctx.log
 
   private def domain = {
     val packageName = getClass.getPackage.getName

@@ -60,6 +60,9 @@ object JobSchedule {
 
     def awaitingJob(jobId: String): Option[Job] =
       waitingList.find(_.id == jobId)
+
+    def jobsNumber: Int =
+      queues.values.flatten.size + waitingList.size
   }
 
   trait JobTypeRegistryQueries {
