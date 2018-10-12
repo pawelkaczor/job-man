@@ -19,6 +19,8 @@ trait JobMan {
 
   def clusterShardingSettingsForWorkers: ClusterShardingSettings
 
+  def distributedPubSub: DistributedPubSubFacade
+
   def readJournal: EventsByPersistenceIdQuery
 
   def actorMaterializer(errorMsg: String): ActorMaterializer

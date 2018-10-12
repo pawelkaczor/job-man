@@ -39,4 +39,7 @@ class JobManInfraServices(implicit actorSystem: ActorSystem[Void]) extends JobMa
   def clusterShardingSettingsForWorkers: ClusterShardingSettings = ???
 
   def jobConfigRegistry: JobConfigRegistry = ???
+
+  def distributedPubSub: DistributedPubSubFacade = ???
+
 }

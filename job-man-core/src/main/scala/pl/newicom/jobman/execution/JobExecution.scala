@@ -5,7 +5,8 @@ import java.util.UUID
 
 import akka.NotUsed
 import akka.actor.typed.Behavior
-import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
+import akka.actor.typed.scaladsl.ActorContext
+import akka.actor.typed.scaladsl.Behaviors.{receiveMessage, same, setup, withTimers}
 import akka.persistence.typed.SideEffect
 import akka.persistence.typed.scaladsl.{Effect, PersistentBehaviors}
 import akka.stream.scaladsl.{Sink, Source}
@@ -17,6 +18,10 @@ import pl.newicom.jobman.execution.command.{ConfirmJobActivity, ExpireOverrunnin
 import pl.newicom.jobman.execution.event._
 import pl.newicom.jobman.execution.result.{JobFailure, SuccessfulJobResult}
 import pl.newicom.jobman.execution.worker.command.ExecuteJob
+import pl.newicom.jobman.healthcheck.HealthCheckTopic
+import pl.newicom.jobman.healthcheck.event.WorkerStopped
+import pl.newicom.jobman.progress.ProgressTopic
+import pl.newicom.jobman.progress.event.JobProgressUpdated
 import pl.newicom.jobman.schedule.CompensatingAction.RemoveFromSchedule
 import pl.newicom.jobman.schedule.JobScheduling.JobSchedulingJournalId
 import pl.newicom.jobman.schedule.event.JobDispatchedForExecution
@@ -30,9 +35,25 @@ object JobExecution {
   val overrunningJobsCheckoutInterval: FiniteDuration = 5.seconds
 
   def behavior(config: JobExecutionConfig)(implicit jm: JobMan): Behavior[JobExecutionCommand] =
-    Behaviors.withTimers(scheduler => {
+    withTimers(scheduler => {
       scheduler.startPeriodicTimer("TickKey", ExpireOverrunningJobs, overrunningJobsCheckoutInterval)
-      Behaviors.setup(ctx => {
+      setup(ctx => {
+
+        def queueTermination: Behavior[WorkerStopped] =
+          receiveMessage { event =>
+            ctx.self ! QueueTerminationReport(event.queueId, event.runningJobs)
+            same
+          }
+
+        def jobActivityConfirmation: Behavior[JobProgressUpdated] =
+          receiveMessage { event =>
+            ctx.self ! ConfirmJobActivity(event.jobId)
+            same
+          }
+
+        jm.distributedPubSub.subscribe(HealthCheckTopic, ctx.spawn(queueTermination, "QueueTerminationReporter"))
+        jm.distributedPubSub.subscribe(ProgressTopic, ctx.spawn(jobActivityConfirmation, "JobActivityConfirmer"))
+
         PersistentBehaviors
           .receive(
             persistenceId = JobExecutionJournalId,
