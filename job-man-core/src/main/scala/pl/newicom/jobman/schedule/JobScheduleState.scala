@@ -17,7 +17,7 @@ case class JobScheduleState(override val queues: Map[Int, List[Entry]] = Map.emp
   def apply(event: JobScheduleEvent): JobScheduleState = event match {
     case JobScheduleEntryAdded(job, queueId, pos) =>
       copy(
-        queues = queues.plus(pos, Entry(job.id, job.params, queueId)),
+        queues = queues.plus(pos, Entry(job, queueId)),
         waitingList = waitingList.filterNot(_ == job)
       )
 

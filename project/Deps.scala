@@ -23,6 +23,7 @@ object Deps {
     val actorTyped       = apply("actor-typed")
     val clusterTools     = apply("cluster-tools")
     val clusterSharding  = apply("cluster-sharding")
+    val clusterShardingTyped  = apply("cluster-sharding-typed")
     val multiNodeTestkit = apply("multi-node-testkit")
     val persistence      = apply("persistence")
     val persistenceTyped = apply("persistence-typed")

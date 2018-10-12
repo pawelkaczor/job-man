@@ -39,7 +39,7 @@ lazy val `job-scheduling-policy` = project
 lazy val `job-man-core` = project
   .settings(
     commonSettings,
-    libraryDependencies ++= Seq(Akka.persistenceTyped, Akka.persistenceQuery, Akka.streamTyped, Akka.slf4j, scalaTest % "test")
+    libraryDependencies ++= Seq(Akka.persistenceTyped, Akka.persistenceQuery, Akka.streamTyped, Akka.clusterShardingTyped, Akka.slf4j, scalaTest % "test")
   ).dependsOn(`job-scheduling-policy`)
 
 

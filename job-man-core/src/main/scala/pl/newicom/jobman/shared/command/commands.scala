@@ -1,6 +1,9 @@
 package pl.newicom.jobman.shared.command
 
-import pl.newicom.jobman.JobResult
+import java.time.ZonedDateTime
+
+import pl.newicom.jobman.execution.command.JobExecutionCommand
+import pl.newicom.jobman.execution.result.JobResult
 import pl.newicom.jobman.schedule.command.JobScheduleCommand
 
 trait HasExecutionJournalOffset {
@@ -12,14 +15,18 @@ case class JobExecutionReport(result: JobResult, executionJournalOffset: Long) e
   def jobId: String = result.jobId
 }
 
-case class JobExpirationReport(jobId: String, followUp: String, executionJournalOffset: Long)
+case class JobExecutionResult(queueId: Int, result: JobResult, dateTime: ZonedDateTime) extends JobExecutionCommand
+
+case class JobExpirationReport(jobId: String, compensation: String, executionJournalOffset: Long)
     extends JobScheduleCommand
     with HasExecutionJournalOffset
 
-case class JobTerminationReport(jobId: String, followUp: String, executionJournalOffset: Long)
+case class JobTerminationReport(jobId: String, compensation: String, executionJournalOffset: Long)
     extends JobScheduleCommand
     with HasExecutionJournalOffset
 
-case object Stop extends JobScheduleCommand
+case class QueueTerminationReport(queueId: Int, terminatedJobs: List[String]) extends JobExecutionCommand
 
-case class StopDueToEventSubsriptionTermination(ex: Throwable) extends JobScheduleCommand
+case object Stop extends JobScheduleCommand with JobExecutionCommand
+
+case class StopDueToEventSubsriptionTermination(ex: Throwable) extends JobScheduleCommand with JobExecutionCommand

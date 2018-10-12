@@ -7,7 +7,10 @@ import akka.persistence.typed.scaladsl.{Effect, PersistentBehaviors}
 import akka.stream.scaladsl.{Sink, Source}
 import akka.stream.typed.scaladsl.ActorSink
 import pl.newicom.jobman._
+import pl.newicom.jobman.execution.JobExecution.JobExecutionJournalId
 import pl.newicom.jobman.execution.event.JobExecutionTerminalEvent
+import pl.newicom.jobman.execution.result.JobResult
+import pl.newicom.jobman.schedule.CompensatingAction.{Reschedule, Retry}
 import pl.newicom.jobman.schedule.JobScheduling.EventHandler
 import pl.newicom.jobman.schedule.command.{CancelJob, JobScheduleCommand, ScheduleJob}
 import pl.newicom.jobman.schedule.event._
@@ -36,7 +39,7 @@ object JobScheduling {
 
     def reactToJobTerminalEvent(reaction: (JobExecutionTerminalEvent, Long) => JobScheduleCommand) = {
       val source: Source[JobScheduleCommand, NotUsed] = jm.readJournal
-        .eventsByPersistenceId(JobSchedulingJournalId, schedule.executionJournalOffset, Long.MaxValue)
+        .eventsByPersistenceId(JobExecutionJournalId, schedule.executionJournalOffset, Long.MaxValue)
         .filter(envelope => envelope.event.isInstanceOf[JobExecutionTerminalEvent])
         .map(envelope => reaction(envelope.event.asInstanceOf[JobExecutionTerminalEvent], envelope.sequenceNr))
 
@@ -48,14 +51,14 @@ object JobScheduling {
     reactToJobTerminalEvent((event, offset) =>
       event match {
 
-        case execution.event.JobExpired(jobId, followUp, _) =>
-          JobExpirationReport(jobId, followUp, offset)
+        case execution.event.JobExpired(jobId, compensation, _) =>
+          JobExpirationReport(jobId, compensation, offset)
 
         case e: execution.event.JobEnded =>
           JobExecutionReport(SuccessfulJobResult(e.jobId), offset)
 
         case e: execution.event.JobTerminated =>
-          JobTerminationReport(e.jobId, e.followUp, offset)
+          JobTerminationReport(e.jobId, e.compensation, offset)
 
     })
   }
@@ -68,7 +71,7 @@ object JobScheduling {
 
   case class SuccessfulJobResult(jobId: String) extends JobResult {
     override def isSuccess: Boolean = true
-    override def jobType: JobType   = ???
+    override def jobType: JobType   = ??? // not used
     override def report: String     = "OK"
   }
 }
@@ -113,8 +116,11 @@ class JobSchedulingCommandHandler(ctx: ActorContext[JobScheduleCommand],
       case cmd: JobExecutionReport =>
         persist(withOffsetChanged(cmd, jobEntryRemoved(schedule, cmd.jobId)))
 
-      case cmd @ JobTerminationReport(jobId, followUp, _) =>
-        persist(withOffsetChanged(cmd, jobTerminated(schedule, jobId, followUp)))
+      case cmd @ JobExpirationReport(jobId, compensation, _) =>
+        persist(withOffsetChanged(cmd, jobExpiredOrTerminated(schedule, jobId, compensation)))
+
+      case cmd @ JobTerminationReport(jobId, compensation, _) =>
+        persist(withOffsetChanged(cmd, jobExpiredOrTerminated(schedule, jobId, compensation)))
 
       case cmd @ (Stop | StopDueToEventSubsriptionTermination(_)) =>
         logger.info("{} received. Stopping Job Scheduling. Number of jobs in the schedule {}", cmd, schedule.jobsNumber)
@@ -141,21 +147,15 @@ class JobSchedulingCommandHandler(ctx: ActorContext[JobScheduleCommand],
     currEvts ++ newEvts
   }
 
-  def jobExpired(schedule: State, jobId: String, fUp: String): List[Event] =
-    followUp(schedule, jobId, fUp)
-
-  def jobTerminated(schedule: State, jobId: String, fUp: String): List[Event] =
-    followUp(schedule, jobId, fUp)
-
-  def followUp(schedule: State, jobId: String, followUp: String): List[Event] =
+  def jobExpiredOrTerminated(schedule: State, jobId: String, compensation: String): List[Event] =
     schedule
       .entry(jobId)
       .map(entry => {
-        followUp match {
-          case "Reschedule" =>
+        compensation match {
+          case Reschedule =>
             val events = jobEntryRemoved(schedule, jobId)
             events ++ jobScheduled(after(schedule, events), entry.job)
-          case "Retry" =>
+          case Retry =>
             jobDispatchedForExecution(Some(entry))
           case _ =>
             jobEntryRemoved(schedule, jobId)

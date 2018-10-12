@@ -1,6 +1,6 @@
 package pl.newicom.jobman
 
-case class Job(id: String, params: JobParameters) {
+case class Job(id: String, jobType: JobType, params: JobParameters) {
 
   def canEqual(a: Any): Boolean = a.isInstanceOf[Job]
 

@@ -1,4 +1,6 @@
-package pl.newicom.jobman
+package pl.newicom.jobman.execution.result
+
+import pl.newicom.jobman.JobType
 
 trait JobResult {
   def jobId: String

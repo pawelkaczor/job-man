@@ -10,8 +10,10 @@ object JobSchedule {
 
   type ParamsPredicate[T <: JobParameters] = (T, T) => Boolean
 
-  case class Entry(jobId: String, params: JobParameters, queueId: Int) {
-    def job: Job = Job(jobId, params)
+  case class Entry(job: Job, queueId: Int) {
+    def jobId: String            = job.id
+    def jobParams: JobParameters = job.params
+    def jobType: JobType         = job.jobType
   }
 
   trait State {
@@ -67,20 +69,9 @@ object JobSchedule {
       queues.values.flatten.size + waitingList.size
   }
 
-  trait JobTypeRegistryQueries {
-    def jobConfigRegistry: JobConfigRegistry
-
-    def jobType(entry: Entry): JobType =
-      jobConfigRegistry.jobType(entry.params)
-
-    def jobType(job: Job): JobType =
-      jobConfigRegistry.jobType(job.params)
-  }
 }
 
-case class JobSchedule(state: State, config: JobSchedulingConfig, jobConfigRegistry: JobConfigRegistry)
-    extends StateQueries
-    with JobTypeRegistryQueries {
+case class JobSchedule(state: State, config: JobSchedulingConfig, jobConfigRegistry: JobConfigRegistry) extends StateQueries {
 
   def enqueueDefault(job: Job): JobSchedulingResult =
     Try {
@@ -111,13 +102,13 @@ case class JobSchedule(state: State, config: JobSchedulingConfig, jobConfigRegis
 
   def enqueueAfter[T <: JobParameters](job: Job, predicate: ParamsPredicate[T]): Option[JobSchedulingResult] =
     enqueueAfter(job, e => {
-      jobType(e) == jobType(job) && predicate(job.params.asInstanceOf[T], e.params.asInstanceOf[T])
+      e.jobType == job.jobType && predicate(job.params.asInstanceOf[T], e.jobParams.asInstanceOf[T])
     })
 
   @SafeVarargs
   def enqueueAfter(job: Job, predicates: ParamsPredicate[JobParameters]*): Option[JobSchedulingResult] = {
     val entryPredicates =
-      predicates.map(p => (e: Entry) => p(job.params, e.params))
+      predicates.map(p => (e: Entry) => p(job.params, e.jobParams))
 
     val results = entryPredicates.flatMap(p => enqueueAfter(job, p).toList)
     if (results.isEmpty)
@@ -150,7 +141,7 @@ case class JobSchedule(state: State, config: JobSchedulingConfig, jobConfigRegis
     enqueueLast(job, entries(entryPredicate).groupBy(_.queueId).keySet)
 
   def rejectIfEquivalentJobEnqueued(job: Job): Option[JobSchedulingResult] =
-    entries(e => jobType(e) == jobType(job) && (e.jobId == job.id || e.params == job.params)).headOption
+    entries(e => e.jobType == job.jobType && (e.jobId == job.id || e.jobParams == job.params)).headOption
       .map(e => EquivalentJobFound(job.id, e.jobId))
 
   private def nextQueueId: Int =
