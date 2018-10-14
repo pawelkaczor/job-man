@@ -2,6 +2,7 @@ package pl.newicom.jobman
 
 import java.time.Clock
 
+import akka.actor.ActorRef
 import akka.cluster.sharding.typed.ClusterShardingSettings
 import akka.cluster.sharding.typed.scaladsl.ClusterSharding
 import akka.persistence.query.scaladsl.EventsByPersistenceIdQuery
@@ -14,6 +15,8 @@ trait JobMan {
   def config: JobManConfig
 
   def jobConfigRegistry: JobConfigRegistry
+
+  def jobCache: ActorRef
 
   def clusterSharding: ClusterSharding
 

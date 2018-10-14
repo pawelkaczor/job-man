@@ -1,5 +1,5 @@
 import Deps._
-import Deps.TestFrameworks.{scalaTest, _}
+import Deps.TestFrameworks.scalaTest
 import sbt.Keys._
 import java.net.URL
 
@@ -11,7 +11,7 @@ version      in ThisBuild := "0.5.0-SNAPSHOT"
 organization in ThisBuild := "pl.newicom.jobman"
 scalaVersion in ThisBuild := "2.12.7"
 
-scalacOptions     in ThisBuild := Seq("-encoding", "utf8", "-deprecation", "-feature", "-language:postfixOps", "-language:implicitConversions", "-unchecked")
+scalacOptions     in ThisBuild := Seq("-encoding", "utf8", "-deprecation", "-feature", "-language:postfixOps", "-language:implicitConversions", "-language:higherKinds", "-unchecked")
 
 publishMavenStyle in ThisBuild := true
 homepage          in ThisBuild := Some(new URL("http://github.com/pawelkaczor/job-man"))

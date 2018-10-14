@@ -2,6 +2,7 @@ package pl.newicom.jobman
 
 import java.time.Clock
 
+import akka.actor.ActorRef
 import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.adapter._
 import akka.cluster.sharding.typed.ClusterShardingSettings
@@ -42,4 +43,5 @@ class JobManInfraServices(implicit actorSystem: ActorSystem[Void]) extends JobMa
 
   def distributedPubSub: DistributedPubSubFacade = ???
 
+  def jobCache: ActorRef = ???
 }

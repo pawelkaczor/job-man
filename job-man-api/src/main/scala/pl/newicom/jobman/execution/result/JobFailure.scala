@@ -4,13 +4,27 @@ import java.io.{PrintWriter, StringWriter}
 
 import pl.newicom.jobman.JobType
 
-object JobFailure {
+trait JobFailure extends JobResult {
+  def jobId: String
+  def jobType: JobType
+  def summary: String
+  def report: String
 
-  def apply(jobId: String, jobType: JobType, reason: Throwable): JobFailure =
+  override def isSuccess: Boolean = false
+}
+
+case class JobTimeout(jobId: String, jobType: JobType) extends JobFailure {
+  override def summary: String = "Job failed due to timeout"
+  override def report: String  = summary
+}
+
+object JobHandlerException {
+
+  def apply(jobId: String, jobType: JobType, reason: Throwable): JobHandlerException =
     apply(jobId, jobType, reason.getMessage, stackTrace(reason))
 
-  def apply(jobId: String, jobType: JobType, summary: String, report: String) =
-    new JobFailure(jobId, jobType, summary, report)
+  def apply(jobId: String, jobType: JobType, summary: String, report: String): JobHandlerException =
+    new JobHandlerException(jobId, jobType, summary, report)
 
   private def stackTrace(throwable: Throwable): String = {
     val sw = new StringWriter
@@ -21,6 +35,4 @@ object JobFailure {
 
 }
 
-case class JobFailure(jobId: String, jobType: JobType, summary: String, report: String) extends JobResult {
-  override def isSuccess: Boolean = false
-}
+case class JobHandlerException(jobId: String, jobType: JobType, summary: String, report: String) extends JobFailure

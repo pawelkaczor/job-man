@@ -16,7 +16,7 @@ import pl.newicom.jobman.execution.JobExecution._
 import pl.newicom.jobman.execution.cluster.WorkerOffice
 import pl.newicom.jobman.execution.command.{ConfirmJobActivity, ExpireOverrunningJobs, JobExecutionCommand, StartJob}
 import pl.newicom.jobman.execution.event._
-import pl.newicom.jobman.execution.result.{JobFailure, SuccessfulJobResult}
+import pl.newicom.jobman.execution.result.{JobFailure, JobTimeout, SuccessfulJobResult}
 import pl.newicom.jobman.execution.worker.command.ExecuteJob
 import pl.newicom.jobman.healthcheck.HealthCheckTopic
 import pl.newicom.jobman.healthcheck.event.WorkerStopped
@@ -41,7 +41,7 @@ object JobExecution {
 
         def queueTermination: Behavior[WorkerStopped] =
           receiveMessage { event =>
-            ctx.self ! QueueTerminationReport(event.queueId, event.runningJobs)
+            ctx.self ! QueueTerminationReport(event.queueId, event.runningJob)
             same
           }
 
@@ -103,8 +103,8 @@ class JobExecutionCommandHandler(ctx: ActorContext[JobExecutionCommand], eventHa
           WorkerOffice.worker(queueId) ! ExecuteJob(queueId, jobExecutionId, job, ctx.self)
         }))
 
-      case cmd @ JobExecutionResult(queueId, result, dateTime) =>
-        persist(jobEnded(cmd))
+      case cmd: JobExecutionResult =>
+        persist(jobEndedOrExpired(state, cmd))
 
       case ExpireOverrunningJobs =>
         persist(jobExpiryCheckRequested(state))
@@ -128,30 +128,34 @@ class JobExecutionCommandHandler(ctx: ActorContext[JobExecutionCommand], eventHa
       SchedulingJournalOffsetChanged(cmd.schedulingJournalOffset + 1)
     )
 
-  def jobEnded(report: JobExecutionResult): JobEnded =
-    report.result match {
+  def jobEndedOrExpired(state: State, report: JobExecutionResult): JobEndedOrExpired =
+    report.jobResult match {
       case r: SuccessfulJobResult =>
         JobCompleted(r.jobId, r, report.dateTime)
+
+      case JobTimeout(jobId, _) =>
+        JobExpired(jobId, onJobExpiredAction(state, jobId), now())
+
       case r: JobFailure =>
         JobFailed(r.jobId, r, report.dateTime)
-      case r =>
-        throw new RuntimeException(String.format("Unknown JobResult: %s", r.getClass))
     }
 
-  def jobExpiryCheckRequested(state: JobExecutionState): List[Event] =
+  def jobExpiryCheckRequested(state: State): List[Event] =
     state.overrunningJobs.map { jobId =>
-      val compensation = state.jobType(jobId).map(onJobExpiredAction).getOrElse(RemoveFromSchedule)
-      JobExpired(jobId, compensation, now())
+      JobExpired(jobId, onJobExpiredAction(state, jobId), now())
     }.toList
 
-  def queueTerminated(queueId: Int, state: JobExecutionState)(implicit jm: JobMan): List[Event] =
+  def queueTerminated(queueId: Int, state: State): List[Event] =
     state.jobsEnqueued(queueId).map {
       case (jobId, entry) =>
         JobTerminated(jobId, entry.jobType, queueId, onJobTerminatedAction(entry.jobType), now(jm.clock))
     }
 
-  def onJobExpiredAction(jobType: JobType): String =
-    jm.jobConfigRegistry.jobConfig(jobType).onJobExpiredAction
+  def onJobExpiredAction(state: State, jobId: String): String =
+    state
+      .jobType(jobId)
+      .map(jobType => jm.jobConfigRegistry.jobConfig(jobType).onJobExpiredAction)
+      .getOrElse(RemoveFromSchedule)
 
   def onJobTerminatedAction(jobType: JobType): String =
     jm.jobConfigRegistry.jobConfig(jobType).onJobTerminatedAction
