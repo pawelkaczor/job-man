@@ -8,7 +8,7 @@ import akka.stream.scaladsl.{Sink, Source}
 import akka.stream.typed.scaladsl.ActorSink
 import pl.newicom.jobman._
 import pl.newicom.jobman.execution.JobExecution.JobExecutionJournalId
-import pl.newicom.jobman.execution.event.JobExecutionTerminalEvent
+import pl.newicom.jobman.execution.event.{JobExecutionTerminalEvent, JobExpired, JobTerminated}
 import pl.newicom.jobman.schedule.CompensatingAction.{Reschedule, Retry}
 import pl.newicom.jobman.schedule.JobScheduling.EventHandler
 import pl.newicom.jobman.schedule.command.{CancelJob, JobScheduleCommand, ScheduleJob}
@@ -47,19 +47,7 @@ object JobScheduling {
       source.runWith(sink)(jm.actorMaterializer("Job Scheduling service failure"))
     }
 
-    reactToJobTerminalEvent((event, offset) =>
-      event match {
-
-        case execution.event.JobExpired(jobId, jobType, compensation, _) =>
-          JobExpirationReport(jobId, jobType, compensation, offset)
-
-        case e: execution.event.JobEnded =>
-          JobExecutionReport(e.jobId, offset)
-
-        case e: execution.event.JobTerminated =>
-          JobTerminationReport(e.jobId, e.compensation, offset)
-
-    })
+    reactToJobTerminalEvent(JobExecutionReport.apply)
   }
 
   type EventHandler = (JobScheduleState, JobScheduleEvent) => JobScheduleState
@@ -107,13 +95,13 @@ class JobSchedulingCommandHandler(ctx: ActorContext[JobScheduleCommand],
             .getOrElse(Effect.none)
         }
 
-      case cmd: JobExecutionReport =>
+      case cmd @ JobExecutionReport(_: execution.event.JobEnded, _) =>
         persist(withOffsetChanged(cmd, jobEntryRemoved(schedule, cmd.jobId)))
 
-      case cmd @ JobExpirationReport(jobId, _, compensation, _) =>
+      case cmd @ JobExecutionReport(JobExpired(jobId, _, compensation, _), _) =>
         persist(withOffsetChanged(cmd, jobExpiredOrTerminated(schedule, jobId, compensation)))
 
-      case cmd @ JobTerminationReport(jobId, compensation, _) =>
+      case cmd @ JobExecutionReport(JobTerminated(jobId, _, _, compensation, _), _) =>
         persist(withOffsetChanged(cmd, jobExpiredOrTerminated(schedule, jobId, compensation)))
 
       case cmd @ (Stop | StopDueToEventSubsriptionTermination(_)) =>

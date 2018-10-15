@@ -56,7 +56,7 @@ object Notification {
           jm.jobConfigRegistry.jobConfig(e.jobType).notifyOnSuccess
       }
 
-    def reactToExecutionTerminalEvent(reaction: (JobExecutionTerminalEvent, Long) => NotificationCommand) = {
+    def reactToJobExecutionTerminalEvent(reaction: (JobExecutionTerminalEvent, Long) => NotificationCommand) = {
       val source: Source[NotificationCommand, NotUsed] = jm.readJournal
         .eventsByPersistenceId(JobExecutionJournalId, state.executionJournalOffset, Long.MaxValue)
         .filter(envelope => envelope.event.isInstanceOf[JobExecutionTerminalEvent])
@@ -68,18 +68,7 @@ object Notification {
       source.runWith(sink)(jm.actorMaterializer("Notification service failure"))
     }
 
-    reactToExecutionTerminalEvent((event, offset) =>
-      event match {
-        case JobExpired(jobId, jobType, compensation, _) =>
-          JobExpirationReport(jobId, jobType, compensation, offset)
-
-        case e: JobEnded =>
-          JobExecutionReport(e.jobId, offset)
-
-        case e: JobTerminated =>
-          JobTerminationReport(e.jobId, e.compensation, offset)
-
-    })
+    reactToJobExecutionTerminalEvent(JobExecutionReport.apply)
 
   }
 
@@ -90,7 +79,8 @@ class NotificationCommandHandler(ctx: ActorContext[NotificationCommand], eventHa
 
   def apply(state: State, command: Command): Effect[Event, State] = command match {
     case cmd @ JobExecutionReport(result, _) =>
-      persist(withOffsetChanged(cmd, NotificationRequested(cmd.jobId, result)))
+      Effect.none
+    //persist(withOffsetChanged(cmd, NotificationRequested(cmd.jobId, result)))
   }
 
   def withOffsetChanged(cmd: HasExecutionJournalOffset, event: NotificationEvent): List[NotificationEvent] =

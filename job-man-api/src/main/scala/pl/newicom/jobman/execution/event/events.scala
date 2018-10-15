@@ -10,10 +10,13 @@ trait JobExecutorEvent
 
 trait JobExecutionEvent extends JobExecutorEvent {
   def jobId: String
+  def jobType: JobType
 }
 
 case class JobStarted(jobId: String, jobType: JobType, queueId: Int, jobExecutionId: String, dateTime: ZonedDateTime)
     extends JobExecutionEvent
+
+case class SchedulingJournalOffsetChanged(newOffsetValue: Long) extends JobExecutorEvent with SubscriptionOffsetChangedEvent
 
 sealed trait JobExecutionTerminalEvent extends JobExecutionEvent {
   def dateTime: ZonedDateTime
@@ -34,5 +37,3 @@ sealed trait JobEnded extends JobEndedOrExpired {
 case class JobCompleted(jobId: String, result: SuccessfulJobResult, dateTime: ZonedDateTime) extends JobEnded
 
 case class JobFailed(jobId: String, result: JobFailure, dateTime: ZonedDateTime) extends JobEnded
-
-case class SchedulingJournalOffsetChanged(newOffsetValue: Long) extends JobExecutorEvent with SubscriptionOffsetChangedEvent
