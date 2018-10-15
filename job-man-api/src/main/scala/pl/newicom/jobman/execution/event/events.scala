@@ -15,19 +15,20 @@ trait JobExecutionEvent extends JobExecutorEvent {
 case class JobStarted(jobId: String, jobType: JobType, queueId: Int, jobExecutionId: String, dateTime: ZonedDateTime)
     extends JobExecutionEvent
 
-trait JobExecutionTerminalEvent extends JobExecutionEvent {
+sealed trait JobExecutionTerminalEvent extends JobExecutionEvent {
   def dateTime: ZonedDateTime
 }
 
-trait JobEndedOrExpired extends JobExecutionTerminalEvent
+sealed trait JobEndedOrExpired extends JobExecutionTerminalEvent
 
-case class JobExpired(jobId: String, compensation: String, dateTime: ZonedDateTime) extends JobEndedOrExpired
+case class JobExpired(jobId: String, jobType: JobType, compensation: String, dateTime: ZonedDateTime) extends JobEndedOrExpired
 
 case class JobTerminated(jobId: String, jobType: JobType, queueId: Int, compensation: String, dateTime: ZonedDateTime)
     extends JobExecutionTerminalEvent
 
-trait JobEnded extends JobEndedOrExpired {
+sealed trait JobEnded extends JobEndedOrExpired {
   def result: JobResult
+  def jobType: JobType = result.jobType
 }
 
 case class JobCompleted(jobId: String, result: SuccessfulJobResult, dateTime: ZonedDateTime) extends JobEnded

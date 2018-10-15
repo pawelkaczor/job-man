@@ -9,7 +9,6 @@ import akka.stream.typed.scaladsl.ActorSink
 import pl.newicom.jobman._
 import pl.newicom.jobman.execution.JobExecution.JobExecutionJournalId
 import pl.newicom.jobman.execution.event.JobExecutionTerminalEvent
-import pl.newicom.jobman.execution.result.JobResult
 import pl.newicom.jobman.schedule.CompensatingAction.{Reschedule, Retry}
 import pl.newicom.jobman.schedule.JobScheduling.EventHandler
 import pl.newicom.jobman.schedule.command.{CancelJob, JobScheduleCommand, ScheduleJob}
@@ -51,11 +50,11 @@ object JobScheduling {
     reactToJobTerminalEvent((event, offset) =>
       event match {
 
-        case execution.event.JobExpired(jobId, compensation, _) =>
-          JobExpirationReport(jobId, compensation, offset)
+        case execution.event.JobExpired(jobId, jobType, compensation, _) =>
+          JobExpirationReport(jobId, jobType, compensation, offset)
 
         case e: execution.event.JobEnded =>
-          JobExecutionReport(SuccessfulJobResult(e.jobId), offset)
+          JobExecutionReport(e.jobId, offset)
 
         case e: execution.event.JobTerminated =>
           JobTerminationReport(e.jobId, e.compensation, offset)
@@ -69,11 +68,6 @@ object JobScheduling {
     case (s, e) => s.apply(e)
   }
 
-  case class SuccessfulJobResult(jobId: String) extends JobResult {
-    override def isSuccess: Boolean = true
-    override def jobType: JobType   = ??? // not used
-    override def report: String     = "OK"
-  }
 }
 
 class JobSchedulingCommandHandler(ctx: ActorContext[JobScheduleCommand],
@@ -116,7 +110,7 @@ class JobSchedulingCommandHandler(ctx: ActorContext[JobScheduleCommand],
       case cmd: JobExecutionReport =>
         persist(withOffsetChanged(cmd, jobEntryRemoved(schedule, cmd.jobId)))
 
-      case cmd @ JobExpirationReport(jobId, compensation, _) =>
+      case cmd @ JobExpirationReport(jobId, _, compensation, _) =>
         persist(withOffsetChanged(cmd, jobExpiredOrTerminated(schedule, jobId, compensation)))
 
       case cmd @ JobTerminationReport(jobId, compensation, _) =>

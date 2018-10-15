@@ -5,13 +5,13 @@ import java.util.concurrent.TimeUnit
 
 import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.Behaviors.{receivePartial, stopped}
+import pl.newicom.jobman.execution.JobExecutionResult
 import pl.newicom.jobman.execution.result.{JobHandlerException, JobResult, JobTimeout}
 import pl.newicom.jobman.execution.worker.command.{ExecuteJob, StopWorker, WorkerCommand}
 import pl.newicom.jobman.handler._
 import pl.newicom.jobman.healthcheck.HealthCheckTopic
 import pl.newicom.jobman.healthcheck.event.WorkerStopped
 import pl.newicom.jobman.progress.JobProgressPublisher
-import pl.newicom.jobman.shared.command.JobExecutionResult
 import pl.newicom.jobman.{DistributedPubSubFacade, JobMan, JobType}
 
 import scala.concurrent.TimeoutException

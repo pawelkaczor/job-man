@@ -8,4 +8,5 @@ trait JobConfig {
   def maxTaskDuration: Duration
   def onJobExpiredAction: String
   def onJobTerminatedAction: String
+  def notifyOnSuccess: Boolean
 }

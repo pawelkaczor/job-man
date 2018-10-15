@@ -7,4 +7,5 @@ trait JobResult {
   def jobType: JobType
   def report: String
   def isSuccess: Boolean
+  def isFailure: Boolean = !isSuccess
 }

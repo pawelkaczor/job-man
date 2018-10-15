@@ -2,8 +2,8 @@ package pl.newicom.jobman.execution.worker.command
 
 import akka.actor.ActorRef
 import pl.newicom.jobman.{Job, JobType}
-import pl.newicom.jobman.shared.command.JobExecutionResult
 import akka.actor.typed.scaladsl.adapter._
+import pl.newicom.jobman.execution.JobExecutionResult
 
 import scala.util.Try
 

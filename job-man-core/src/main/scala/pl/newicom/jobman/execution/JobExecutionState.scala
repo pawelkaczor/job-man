@@ -35,8 +35,8 @@ case class JobExecutionState(@transient jobConfigRegistry: JobConfigRegistry,
       copy(entries = entries - event.jobId)
   }
 
-  def overrunningJobs: Set[String] =
-    entries.filter { case (jobId, entry) => now().isAfter(jobDeadline(jobId, entry)) }.keySet
+  def overrunningJobs: Map[String, Entry] =
+    entries.filter { case (jobId, entry) => now().isAfter(jobDeadline(jobId, entry)) }
 
   def jobDeadline(jobId: String, entry: Entry): ZonedDateTime =
     recentActivityMap
@@ -44,15 +44,12 @@ case class JobExecutionState(@transient jobConfigRegistry: JobConfigRegistry,
       .map(_.plus(jobConfig(entry.jobType).maxTaskDuration))
       .getOrElse(entry.jobDeadline)
 
-  def jobType(jobId: String): Option[JobType] =
-    entries.get(jobId).map(_.jobType)
-
   def updateJobActivityTimestamp(jobId: String): Unit =
     if (entries.contains(jobId))
       recentActivityMap.put(jobId, now)
 
-  def jobsEnqueued(queueId: Integer): List[(String, Entry)] =
-    entries.filter { case (_, entry) => entry.queueId == queueId }.toList
+  def runningJob(queueId: Integer): Option[(String, Entry)] =
+    entries.find { case (_, entry) => entry.queueId == queueId }
 
   def jobConfig(jobType: JobType): JobConfig =
     jobConfigRegistry.jobConfig(jobType)

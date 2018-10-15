@@ -22,10 +22,9 @@ import pl.newicom.jobman.healthcheck.HealthCheckTopic
 import pl.newicom.jobman.healthcheck.event.WorkerStopped
 import pl.newicom.jobman.progress.ProgressTopic
 import pl.newicom.jobman.progress.event.JobProgressUpdated
-import pl.newicom.jobman.schedule.CompensatingAction.RemoveFromSchedule
 import pl.newicom.jobman.schedule.JobScheduling.JobSchedulingJournalId
 import pl.newicom.jobman.schedule.event.JobDispatchedForExecution
-import pl.newicom.jobman.shared.command.{JobExecutionResult, QueueTerminationReport, Stop, StopDueToEventSubsriptionTermination}
+import pl.newicom.jobman.shared.command.{QueueTerminationReport, Stop, StopDueToEventSubsriptionTermination}
 
 import scala.concurrent.duration._
 
@@ -133,31 +132,32 @@ class JobExecutionCommandHandler(ctx: ActorContext[JobExecutionCommand], eventHa
       case r: SuccessfulJobResult =>
         JobCompleted(r.jobId, r, report.dateTime)
 
-      case JobTimeout(jobId, _) =>
-        JobExpired(jobId, onJobExpiredAction(state, jobId), now())
+      case JobTimeout(jobId, jobType) =>
+        jobExpired(jobId, jobType)
 
       case r: JobFailure =>
         JobFailed(r.jobId, r, report.dateTime)
     }
 
   def jobExpiryCheckRequested(state: State): List[Event] =
-    state.overrunningJobs.map { jobId =>
-      JobExpired(jobId, onJobExpiredAction(state, jobId), now())
+    state.overrunningJobs.map {
+      case (jobId, entry) =>
+        jobExpired(jobId, entry.jobType)
     }.toList
 
   def queueTerminated(queueId: Int, state: State): List[Event] =
-    state.jobsEnqueued(queueId).map {
-      case (jobId, entry) =>
-        JobTerminated(jobId, entry.jobType, queueId, onJobTerminatedAction(entry.jobType), now(jm.clock))
-    }
-
-  def onJobExpiredAction(state: State, jobId: String): String =
     state
-      .jobType(jobId)
-      .map(jobType => jm.jobConfigRegistry.jobConfig(jobType).onJobExpiredAction)
-      .getOrElse(RemoveFromSchedule)
+      .runningJob(queueId)
+      .map {
+        case (jobId, entry) =>
+          val compensation = jm.jobConfigRegistry.jobConfig(entry.jobType).onJobTerminatedAction
+          JobTerminated(jobId, entry.jobType, queueId, compensation, now(jm.clock))
+      }
+      .toList
 
-  def onJobTerminatedAction(jobType: JobType): String =
-    jm.jobConfigRegistry.jobConfig(jobType).onJobTerminatedAction
+  def jobExpired(jobId: String, jobType: JobType): JobExpired = {
+    val compensation = jm.jobConfigRegistry.jobConfig(jobType).onJobExpiredAction
+    JobExpired(jobId, jobType, compensation, now())
+  }
 
 }
