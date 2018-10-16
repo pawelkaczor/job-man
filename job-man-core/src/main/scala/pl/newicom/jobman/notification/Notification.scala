@@ -1,12 +1,10 @@
 package pl.newicom.jobman.notification
-import akka.NotUsed
 import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.ActorContext
 import akka.actor.typed.scaladsl.Behaviors.{setup, withTimers}
 import akka.persistence.typed.scaladsl.{Effect, PersistentBehaviors}
-import akka.stream.scaladsl.{Sink, Source}
 import akka.stream.typed.scaladsl.ActorSink
-import pl.newicom.jobman.execution.JobExecution.JobExecutionJournalId
+import pl.newicom.jobman.execution.JobExecution.jobExecutionReportSource
 import pl.newicom.jobman.execution.event._
 import pl.newicom.jobman.notification.Notification.EventHandler
 import pl.newicom.jobman.notification.command.{NotificationCommand, SendAwaitingNotifications}
@@ -27,6 +25,21 @@ object Notification {
       scheduler.startPeriodicTimer("TickKey", SendAwaitingNotifications, checkoutInterval)
       setup(ctx => {
 
+        def isNotificationRequired(event: JobExecutionTerminalEvent): Boolean =
+          event match {
+            case JobFailed(_, _, _) | JobExpired(_, _, _, _) | JobTerminated(_, _, _, _, _) =>
+              true
+            case e: JobCompleted =>
+              jm.jobConfigRegistry.jobConfig(e.jobType).notifyOnSuccess
+          }
+
+        def recoveryHandler(state: NotificationState): Unit = {
+          ctx.log.info("Notification Service resumed from executionJournalOffset: {}", state.executionJournalOffset)
+          jobExecutionReportSource(state.executionJournalOffset, filter = isNotificationRequired).runWith {
+            ActorSink.actorRef(ctx.self, Stop, StopDueToEventSubsriptionTermination.apply)
+          }(jm.actorMaterializer("Notification service failure"))
+        }
+
         PersistentBehaviors
           .receive(
             persistenceId = NotificationJournalId,
@@ -34,7 +47,7 @@ object Notification {
             commandHandler = new NotificationCommandHandler(ctx, eventHandler),
             eventHandler = eventHandler
           )
-          .onRecoveryCompleted(recoveryHandler(ctx))
+          .onRecoveryCompleted(recoveryHandler)
           .snapshotEvery(jm.config.journalSnapshotInterval)
       })
     })
@@ -43,33 +56,6 @@ object Notification {
 
   private val eventHandler: EventHandler = {
     case (s, e) => s.apply(e)
-  }
-
-  private def recoveryHandler(ctx: ActorContext[NotificationCommand])(implicit jm: JobMan): NotificationState => Unit = { state =>
-    ctx.log.info("Notification Service resumed from executionJournalOffset: {}", state.executionJournalOffset)
-
-    def isNotificationRequired(event: JobExecutionTerminalEvent): Boolean =
-      event match {
-        case JobFailed(_, _, _) | JobExpired(_, _, _, _) | JobTerminated(_, _, _, _, _) =>
-          true
-        case e: JobCompleted =>
-          jm.jobConfigRegistry.jobConfig(e.jobType).notifyOnSuccess
-      }
-
-    def reactToJobExecutionTerminalEvent(reaction: (JobExecutionTerminalEvent, Long) => NotificationCommand) = {
-      val source: Source[NotificationCommand, NotUsed] = jm.readJournal
-        .eventsByPersistenceId(JobExecutionJournalId, state.executionJournalOffset, Long.MaxValue)
-        .filter(envelope => envelope.event.isInstanceOf[JobExecutionTerminalEvent])
-        .filter(envelope => isNotificationRequired(envelope.event.asInstanceOf[JobExecutionTerminalEvent]))
-        .map(envelope => reaction(envelope.event.asInstanceOf[JobExecutionTerminalEvent], envelope.sequenceNr))
-
-      val sink: Sink[NotificationCommand, NotUsed] = ActorSink.actorRef(ctx.self, Stop, StopDueToEventSubsriptionTermination.apply)
-
-      source.runWith(sink)(jm.actorMaterializer("Notification service failure"))
-    }
-
-    reactToJobExecutionTerminalEvent(JobExecutionReport.apply)
-
   }
 
 }

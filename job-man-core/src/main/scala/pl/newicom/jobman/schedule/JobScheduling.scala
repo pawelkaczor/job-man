@@ -1,14 +1,12 @@
 package pl.newicom.jobman.schedule
 
-import akka.NotUsed
 import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.persistence.typed.scaladsl.{Effect, PersistentBehaviors}
-import akka.stream.scaladsl.{Sink, Source}
 import akka.stream.typed.scaladsl.ActorSink
 import pl.newicom.jobman._
-import pl.newicom.jobman.execution.JobExecution.JobExecutionJournalId
-import pl.newicom.jobman.execution.event.{JobExecutionTerminalEvent, JobExpired, JobTerminated}
+import pl.newicom.jobman.execution.JobExecution.jobExecutionReportSource
+import pl.newicom.jobman.execution.event.{JobExpired, JobTerminated}
 import pl.newicom.jobman.schedule.CompensatingAction.{Reschedule, Retry}
 import pl.newicom.jobman.schedule.JobScheduling.EventHandler
 import pl.newicom.jobman.schedule.command.{CancelJob, JobScheduleCommand, ScheduleJob}
@@ -22,6 +20,15 @@ object JobScheduling {
 
   def behavior(policy: JobSchedulingPolicy, config: JobSchedulingConfig)(implicit jm: JobMan): Behavior[JobScheduleCommand] =
     Behaviors.setup(ctx => {
+
+      def recoveryHandler(schedule: JobScheduleState): Unit = {
+        ctx.log.info("Job Scheduling resumed from executionJournalOffset: {}", schedule.executionJournalOffset)
+
+        jobExecutionReportSource(schedule.executionJournalOffset).runWith {
+          ActorSink.actorRef(ctx.self, Stop, StopDueToEventSubsriptionTermination.apply)
+        }(jm.actorMaterializer("Job Scheduling service failure"))
+      }
+
       PersistentBehaviors
         .receive(
           persistenceId = JobSchedulingJournalId,
@@ -29,26 +36,9 @@ object JobScheduling {
           commandHandler = new JobSchedulingCommandHandler(ctx, policy, config, eventHandler),
           eventHandler
         )
-        .onRecoveryCompleted(recoveryHandler(ctx))
+        .onRecoveryCompleted(recoveryHandler)
         .snapshotEvery(jm.config.journalSnapshotInterval)
     })
-
-  private def recoveryHandler(ctx: ActorContext[JobScheduleCommand])(implicit jm: JobMan): JobScheduleState => Unit = { schedule =>
-    ctx.log.info("Job Scheduling resumed from executionJournalOffset: {}", schedule.executionJournalOffset)
-
-    def reactToJobTerminalEvent(reaction: (JobExecutionTerminalEvent, Long) => JobScheduleCommand) = {
-      val source: Source[JobScheduleCommand, NotUsed] = jm.readJournal
-        .eventsByPersistenceId(JobExecutionJournalId, schedule.executionJournalOffset, Long.MaxValue)
-        .filter(envelope => envelope.event.isInstanceOf[JobExecutionTerminalEvent])
-        .map(envelope => reaction(envelope.event.asInstanceOf[JobExecutionTerminalEvent], envelope.sequenceNr))
-
-      val sink: Sink[JobScheduleCommand, NotUsed] = ActorSink.actorRef(ctx.self, Stop, StopDueToEventSubsriptionTermination.apply)
-
-      source.runWith(sink)(jm.actorMaterializer("Job Scheduling service failure"))
-    }
-
-    reactToJobTerminalEvent(JobExecutionReport.apply)
-  }
 
   type EventHandler = (JobScheduleState, JobScheduleEvent) => JobScheduleState
 

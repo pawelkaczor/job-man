@@ -24,7 +24,7 @@ import pl.newicom.jobman.progress.ProgressTopic
 import pl.newicom.jobman.progress.event.JobProgressUpdated
 import pl.newicom.jobman.schedule.JobScheduling.JobSchedulingJournalId
 import pl.newicom.jobman.schedule.event.JobDispatchedForExecution
-import pl.newicom.jobman.shared.command.{QueueTerminationReport, Stop, StopDueToEventSubsriptionTermination}
+import pl.newicom.jobman.shared.command.{JobExecutionReport, QueueTerminationReport, Stop, StopDueToEventSubsriptionTermination}
 
 import scala.concurrent.duration._
 
@@ -87,6 +87,15 @@ object JobExecution {
   private val eventHandler: EventHandler = {
     case (s, e) => s.apply(e)
   }
+
+  def jobExecutionReportSource(journalOffset: Long, filter: JobExecutionTerminalEvent => Boolean = _ => true)(
+      implicit jm: JobMan): Source[JobExecutionReport, NotUsed] =
+    jm.readJournal
+      .eventsByPersistenceId(JobExecutionJournalId, journalOffset, Long.MaxValue)
+      .filter(envelope => envelope.event.isInstanceOf[JobExecutionTerminalEvent])
+      .map(envelope => (envelope.event.asInstanceOf[JobExecutionTerminalEvent], envelope.sequenceNr))
+      .filter { case (event, _) => filter(event) }
+      .map { case (event, offset) => JobExecutionReport(event, offset) }
 
 }
 
