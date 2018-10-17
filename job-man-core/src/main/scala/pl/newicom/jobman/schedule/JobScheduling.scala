@@ -25,7 +25,7 @@ object JobScheduling {
         ctx.log.info("Job Scheduling resumed from executionJournalOffset: {}", schedule.executionJournalOffset)
 
         jobExecutionReportSource(schedule.executionJournalOffset).runWith {
-          ActorSink.actorRef(ctx.self, Stop, StopDueToEventSubsriptionTermination.apply)
+          ActorSink.actorRef(ctx.self, Stop, StopDueToEventSubsriptionTermination)
         }(jm.actorMaterializer("Job Scheduling service failure"))
       }
 

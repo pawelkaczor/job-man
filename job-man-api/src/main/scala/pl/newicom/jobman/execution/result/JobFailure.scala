@@ -13,11 +13,6 @@ trait JobFailure extends JobResult {
   override def isSuccess: Boolean = false
 }
 
-case class JobTimeout(jobId: String, jobType: JobType) extends JobFailure {
-  override def summary: String = "Job failed due to timeout"
-  override def report: String  = summary
-}
-
 object JobHandlerException {
 
   def apply(jobId: String, jobType: JobType, reason: Throwable): JobHandlerException =

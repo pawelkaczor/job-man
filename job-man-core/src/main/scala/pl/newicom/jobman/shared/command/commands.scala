@@ -20,7 +20,7 @@ case class JobExecutionReport(result: JobExecutionTerminalEvent, executionJourna
   def jobType: JobType = result.jobType
 }
 
-case class QueueTerminationReport(queueId: Int, terminatedJob: Option[String]) extends JobExecutionCommand with NotificationCommand
+case class QueueTerminationReport(queueId: Int) extends JobExecutionCommand with NotificationCommand
 
 case object Stop extends JobScheduleCommand with JobExecutionCommand with NotificationCommand
 

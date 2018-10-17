@@ -4,19 +4,23 @@ import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
 
 import akka.actor.typed.Behavior
-import akka.actor.typed.scaladsl.Behaviors.{receivePartial, stopped}
-import pl.newicom.jobman.execution.JobExecutionResult
-import pl.newicom.jobman.execution.result.{JobHandlerException, JobResult, JobTimeout}
-import pl.newicom.jobman.execution.worker.command.{ExecuteJob, StopWorker, WorkerCommand}
+import akka.actor.typed.Behavior.same
+import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
+import akka.actor.typed.scaladsl.Behaviors.stopped
+import akka.pattern.after
+import pl.newicom.jobman.execution.result.{JobHandlerException, JobResult}
+import pl.newicom.jobman.execution.worker.command._
 import pl.newicom.jobman.handler._
 import pl.newicom.jobman.healthcheck.HealthCheckTopic
 import pl.newicom.jobman.healthcheck.event.WorkerStopped
 import pl.newicom.jobman.progress.JobProgressPublisher
 import pl.newicom.jobman.{DistributedPubSubFacade, JobMan, JobType}
 
-import scala.concurrent.TimeoutException
 import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.{Future, TimeoutException}
 import scala.util.control.NonFatal
+import scala.compat.java8.FutureConverters._
+import scala.util.{Failure, Success}
 
 class WorkerContext(val queueId: Int, jm: JobMan, jhProvider: JobHandlerProvider) {
   def now: ZonedDateTime =
@@ -39,66 +43,57 @@ class WorkerContext(val queueId: Int, jm: JobMan, jhProvider: JobHandlerProvider
 object WorkerBehavior {
 
   def workerBehavior(queueId: String, jobHandlerProvider: JobHandlerProvider)(implicit jm: JobMan): Behavior[WorkerCommand] =
-    workerBehavior(new WorkerContext(queueId.toInt, jm, jobHandlerProvider), None)
+    workerBehavior(new WorkerContext(queueId.toInt, jm, jobHandlerProvider))
 
-  def workerBehavior(ctx: WorkerContext, runningJob: Option[String]): Behavior[WorkerCommand] =
-    receivePartial {
+  def workerBehavior(ctx: WorkerContext): Behavior[WorkerCommand] =
+    Behaviors.receive {
       case (actorCtx, cmd @ ExecuteJob(queueId, jobExecutionId, job, _)) =>
+        import actorCtx.executionContext
+        val progressListener = ctx.jobProgressListener(job.id, jobExecutionId)
+        val scheduler        = actorCtx.system.scheduler
+        val maxJobDuration   = ctx.maxJobDuration(job.jobType)
+
+        def executeJobHandler: Future[JobResult] =
+          ctx.jobHandler(job.jobType) match {
+            case jh: VanillaJavaJobHandler =>
+              jh.execute(job, progressListener).toScala
+            case jh: VanillaScalaJobHandler =>
+              jh.execute(job, progressListener)
+          }
+
         actorCtx.log.info("Execution of Job {} started on queue {}.", job, queueId)
 
-        val pl = ctx.jobProgressListener(job.id, jobExecutionId)
-
-        def log(jobResult: JobResult): Unit =
-          if (jobResult.isSuccess) {
-            actorCtx.log.info("Job {} completed.", job)
-          } else {
-            actorCtx.log.error("Job {} failed. Exception: {}", job, jobResult.report)
+        after(maxJobDuration, scheduler)(executeJobHandler)
+          .map(JobExecutionResult(queueId, _, ctx.now))
+          .recover {
+            case _: TimeoutException => JobTimeout(queueId, job.id, job.jobType)
+            case NonFatal(ex)        => JobExecutionResult(queueId, JobHandlerException(job.id, job.jobType, ex), ctx.now)
+          }
+          .onComplete {
+            case Success(response) =>
+              log(actorCtx, response)
+              cmd.responseCallback ! response
+            case Failure(ex) =>
+              actorCtx.log.error(ex, "Fatal exception")
           }
 
-        def handleJobResult(jobResult: JobResult): Unit = {
-          val jobExecutionResult = JobExecutionResult(queueId, jobResult, ctx.now)
-          log(jobExecutionResult.jobResult)
-          cmd.reportCallback ! jobExecutionResult
-          actorCtx.self ! jobExecutionResult
-        }
-
-        def executeJava(jh: VanillaJavaJobHandler) =
-          jh.execute(job, pl)
-            .exceptionally(ex => JobHandlerException(job.id, job.jobType, ex))
-            .thenAccept(handleJobResult(_))
-
-        def executeScala(jh: VanillaScalaJobHandler): Unit = {
-          import actorCtx.executionContext
-          import akka.pattern.after
-          after(ctx.maxJobDuration(job.jobType), actorCtx.system.scheduler) {
-            jh.execute(job, pl)
-              .recover {
-                case _: TimeoutException => JobTimeout(job.id, job.jobType)
-                case NonFatal(ex)        => JobHandlerException(job.id, job.jobType, ex)
-              }
-          }.onComplete {
-            case scala.util.Success(result) =>
-              handleJobResult(result)
-            case _ => // ignore
-          }
-        }
-
-        ctx.jobHandler(job.jobType) match {
-          case jh: VanillaJavaJobHandler =>
-            executeJava(jh)
-          case jh: VanillaScalaJobHandler =>
-            executeScala(jh)
-        }
-
-        workerBehavior(ctx, Some(job.id))
-
-      case (_, _: JobExecutionResult) =>
-        workerBehavior(ctx, None)
+        same
 
       case (actorCtx, StopWorker) =>
-        ctx.pubSub.publish(HealthCheckTopic, WorkerStopped(ctx.queueId, runningJob, ctx.now))
+        ctx.pubSub.publish(HealthCheckTopic, WorkerStopped(ctx.queueId, ctx.now))
         actorCtx.log.info("Queue {} stopped.", ctx.queueId)
         stopped
     }
+
+  def log(ctx: ActorContext[_], response: WorkerResponse): Unit = response match {
+    case r: JobExecutionResult if r.jobResult.isSuccess =>
+      ctx.log.info("Job {} completed.", r.jobId)
+
+    case r: JobExecutionResult =>
+      ctx.log.error("Job {} failed. Exception: {}", r.jobId, r.jobResult.report)
+
+    case r: JobTimeout =>
+      ctx.log.error("Job {} expired", r.jobId)
+  }
 
 }

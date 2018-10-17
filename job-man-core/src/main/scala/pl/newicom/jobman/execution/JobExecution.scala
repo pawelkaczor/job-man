@@ -16,8 +16,8 @@ import pl.newicom.jobman.execution.JobExecution._
 import pl.newicom.jobman.execution.cluster.WorkerOffice
 import pl.newicom.jobman.execution.command.{ConfirmJobActivity, ExpireOverrunningJobs, JobExecutionCommand, StartJob}
 import pl.newicom.jobman.execution.event._
-import pl.newicom.jobman.execution.result.{JobFailure, JobTimeout, SuccessfulJobResult}
-import pl.newicom.jobman.execution.worker.command.ExecuteJob
+import pl.newicom.jobman.execution.result.{JobFailure, SuccessfulJobResult}
+import pl.newicom.jobman.execution.worker.command.{ExecuteJob, JobExecutionResult, JobTimeout}
 import pl.newicom.jobman.healthcheck.HealthCheckTopic
 import pl.newicom.jobman.healthcheck.event.WorkerStopped
 import pl.newicom.jobman.progress.ProgressTopic
@@ -40,7 +40,7 @@ object JobExecution {
 
         def queueTermination: Behavior[WorkerStopped] =
           receiveMessage { event =>
-            ctx.self ! QueueTerminationReport(event.queueId, event.runningJob)
+            ctx.self ! QueueTerminationReport(event.queueId)
             same
           }
 
@@ -112,12 +112,15 @@ class JobExecutionCommandHandler(ctx: ActorContext[JobExecutionCommand], eventHa
         }))
 
       case cmd: JobExecutionResult =>
-        persist(jobEndedOrExpired(state, cmd))
+        persist(jobEnded(state, cmd))
+
+      case JobTimeout(_, jobId, jobType) =>
+        persist(jobExpired(jobId, jobType))
 
       case ExpireOverrunningJobs =>
         persist(jobExpiryCheckRequested(state))
 
-      case QueueTerminationReport(queueId, _) =>
+      case QueueTerminationReport(queueId) =>
         persist(queueTerminated(queueId, state))
 
       case ConfirmJobActivity(jobId) =>
@@ -136,13 +139,10 @@ class JobExecutionCommandHandler(ctx: ActorContext[JobExecutionCommand], eventHa
       SchedulingJournalOffsetChanged(cmd.schedulingJournalOffset + 1)
     )
 
-  def jobEndedOrExpired(state: State, report: JobExecutionResult): JobEndedOrExpired =
+  def jobEnded(state: State, report: JobExecutionResult): JobEnded =
     report.jobResult match {
       case r: SuccessfulJobResult =>
         JobCompleted(r.jobId, r, report.dateTime)
-
-      case JobTimeout(jobId, jobType) =>
-        jobExpired(jobId, jobType)
 
       case r: JobFailure =>
         JobFailed(r.jobId, r, report.dateTime)

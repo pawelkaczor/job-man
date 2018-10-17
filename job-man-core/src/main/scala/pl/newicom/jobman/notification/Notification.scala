@@ -1,16 +1,19 @@
 package pl.newicom.jobman.notification
+import java.util.function.Supplier
+
 import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.ActorContext
 import akka.actor.typed.scaladsl.Behaviors.{setup, withTimers}
+import akka.persistence.typed.SideEffect
 import akka.persistence.typed.scaladsl.{Effect, PersistentBehaviors}
 import akka.stream.typed.scaladsl.ActorSink
 import pl.newicom.jobman.execution.JobExecution.jobExecutionReportSource
 import pl.newicom.jobman.execution.event._
 import pl.newicom.jobman.notification.Notification.EventHandler
-import pl.newicom.jobman.notification.command.{NotificationCommand, SendAwaitingNotifications}
+import pl.newicom.jobman.notification.command.{AcknowledgeNotificationSent, NotificationCommand, SendAwaitingNotifications}
 import pl.newicom.jobman.shared.command._
 import pl.newicom.jobman.shared.event.ExecutionJournalOffsetChanged
-import pl.newicom.jobman.{EventSourcedCommandHandler, JobMan}
+import pl.newicom.jobman.{EventSourcedCommandHandler, JobMan, JobParameters}
 
 import scala.concurrent.duration._
 
@@ -20,7 +23,8 @@ object Notification {
   val checkoutInterval: FiniteDuration = 1.minutes
   val cacheAskTimeout: FiniteDuration  = 3.seconds
 
-  def behavior(implicit jm: JobMan): Behavior[NotificationCommand] =
+  def behavior(jobNotificationSender: JobNotificationSender, jobNotificationMessageFactory: JobNotificationMessageFactory)(
+      implicit jm: JobMan): Behavior[NotificationCommand] =
     withTimers(scheduler => {
       scheduler.startPeriodicTimer("TickKey", SendAwaitingNotifications, checkoutInterval)
       setup(ctx => {
@@ -36,7 +40,7 @@ object Notification {
         def recoveryHandler(state: NotificationState): Unit = {
           ctx.log.info("Notification Service resumed from executionJournalOffset: {}", state.executionJournalOffset)
           jobExecutionReportSource(state.executionJournalOffset, filter = isNotificationRequired).runWith {
-            ActorSink.actorRef(ctx.self, Stop, StopDueToEventSubsriptionTermination.apply)
+            ActorSink.actorRef(ctx.self, Stop, StopDueToEventSubsriptionTermination)
           }(jm.actorMaterializer("Notification service failure"))
         }
 
@@ -44,7 +48,7 @@ object Notification {
           .receive(
             persistenceId = NotificationJournalId,
             emptyState = NotificationState(),
-            commandHandler = new NotificationCommandHandler(ctx, eventHandler),
+            commandHandler = new NotificationCommandHandler(ctx, eventHandler, jobNotificationSender, jobNotificationMessageFactory),
             eventHandler = eventHandler
           )
           .onRecoveryCompleted(recoveryHandler)
@@ -60,15 +64,41 @@ object Notification {
 
 }
 
-class NotificationCommandHandler(ctx: ActorContext[NotificationCommand], eventHandler: EventHandler)(implicit jm: JobMan)
+class NotificationCommandHandler(ctx: ActorContext[NotificationCommand],
+                                 eventHandler: EventHandler,
+                                 notificationSender: JobNotificationSender,
+                                 notificationFactory: JobNotificationMessageFactory)(implicit jm: JobMan)
     extends EventSourcedCommandHandler[NotificationCommand, NotificationEvent, NotificationState](ctx, eventHandler) {
 
   def apply(state: State, command: Command): Effect[Event, State] = command match {
     case cmd @ JobExecutionReport(result, _) =>
-      Effect.none
-    //persist(withOffsetChanged(cmd, NotificationRequested(cmd.jobId, result)))
+      persist(withOffsetChanged(cmd, NotificationRequested(cmd.jobId, result)))
+        .andThen(SideEffect[State](_ => sendNotification(cmd.jobId, result)))
+
+    case SendAwaitingNotifications =>
+      Effect.none.andThen(SideEffect[State](_.awaitingNotifications.foreach {
+        case (jobId, result) =>
+          sendNotification(jobId, result)
+      }))
+
+    case AcknowledgeNotificationSent(jobId) =>
+      persist(NotificationAcknowledged(jobId))
+
+    case cmd @ (Stop | StopDueToEventSubsriptionTermination(_)) =>
+      logger.info("{} received. Stopping Notification Service at executionJournalOffset: {}", cmd, state.executionJournalOffset)
+      Effect.stop
+
   }
 
   def withOffsetChanged(cmd: HasExecutionJournalOffset, event: NotificationEvent): List[NotificationEvent] =
     List(ExecutionJournalOffsetChanged(cmd.executionJournalOffset + 1), event)
+
+  private def sendNotification(jobId: String, result: JobExecutionTerminalEvent) =
+    notificationFactory(result, () => ???).foreach(notificationSender(_).whenComplete((_, ex) => {
+      if (ex == null)
+        ctx.self ! AcknowledgeNotificationSent(jobId)
+      else
+        logger.error(ex, "Sending of notification failed!")
+    }))
+
 }
