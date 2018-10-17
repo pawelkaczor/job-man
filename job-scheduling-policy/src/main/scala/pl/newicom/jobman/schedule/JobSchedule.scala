@@ -4,8 +4,6 @@ import pl.newicom.jobman.schedule.JobSchedule._
 import pl.newicom.jobman.schedule.event.{EquivalentJobFound, JobAddedToWaitingList, JobScheduleEntryAdded, JobSchedulingResult}
 import pl.newicom.jobman.{Job, JobParameters, JobType, JobConfigRegistry}
 
-import scala.util.Try
-
 object JobSchedule {
 
   type ParamsPredicate[T <: JobParameters] = (T, T) => Boolean
@@ -73,23 +71,16 @@ object JobSchedule {
 
 case class JobSchedule(state: State, config: JobSchedulingConfig, jobConfigRegistry: JobConfigRegistry) extends StateQueries {
 
-  def enqueueDefault(job: Job): JobSchedulingResult =
-    Try {
-      if (notEmptyQueuesNumber < config.getMinQueues)
-        enqueueInNewQueue(job)
-      else {
-        queueWithTheLowestNrOfEnqueuedJobs
-          .filter(qId => queueLength(qId) < config.getQueueCapacity)
-          .map(enqueueLast(job, _))
-          .getOrElse(enqueueInNewQueue(job))
-      }
-    }.recover {
-      case _: JobSchedulingException =>
-        copy(config = config.withQueueCapacityBumped).enqueueDefault(job)
-    }.get
-
-  private def enqueueInNewQueue(job: Job): JobSchedulingResult =
-    JobScheduleEntryAdded(job, this.nextQueueId, 0)
+  def enqueueDefault(job: Job): JobSchedulingResult = {
+    (if (notEmptyQueuesNumber < config.getMinQueues)
+       enqueueInNewQueue(job)
+     else {
+       queueWithTheLowestNrOfEnqueuedJobs
+         .filter(qId => queueLength(qId) < config.getQueueCapacity)
+         .map(enqueueLast(job, _))
+         .orElse(enqueueInNewQueue(job))
+     }).getOrElse(copy(config = config.withQueueCapacityBumped).enqueueDefault(job))
+  }
 
   def enqueueLast(job: Job, queueId: Int): JobSchedulingResult =
     JobScheduleEntryAdded(job, queueId, queueLength(queueId))
@@ -127,6 +118,13 @@ case class JobSchedule(state: State, config: JobSchedulingConfig, jobConfigRegis
       }
   }
 
+  def rejectIfEquivalentJobEnqueued(job: Job): Option[JobSchedulingResult] =
+    entries(e => e.jobType == job.jobType && (e.jobId == job.id || e.jobParams == job.params)).headOption
+      .map(e => EquivalentJobFound(job.id, e.jobId))
+
+  private def enqueueInNewQueue(job: Job): Option[JobSchedulingResult] =
+    nextQueueId.map(JobScheduleEntryAdded(job, _, 0))
+
   private def enqueueLast(job: Job, queues: Set[Int]): Option[JobSchedulingResult] =
     if (queues.isEmpty)
       None
@@ -140,17 +138,10 @@ case class JobSchedule(state: State, config: JobSchedulingConfig, jobConfigRegis
   private def enqueueAfter(job: Job, entryPredicate: Entry => Boolean): Option[JobSchedulingResult] =
     enqueueLast(job, entries(entryPredicate).groupBy(_.queueId).keySet)
 
-  def rejectIfEquivalentJobEnqueued(job: Job): Option[JobSchedulingResult] =
-    entries(e => e.jobType == job.jobType && (e.jobId == job.id || e.jobParams == job.params)).headOption
-      .map(e => EquivalentJobFound(job.id, e.jobId))
-
-  private def nextQueueId: Int =
-    emptyQueues.keys.headOption.getOrElse {
-      val qNum = notEmptyQueuesNumber
-      if (qNum < config.getMaxQueues)
-        qNum + 1
-      else
-        throw new JobSchedulingException("Maximum number of queues reached.")
+  private def nextQueueId: Option[Int] =
+    emptyQueues.keys.headOption.orElse {
+      val notEmptyNum = notEmptyQueuesNumber
+      if (notEmptyNum < config.getMaxQueues) Some(notEmptyNum + 1) else None
     }
 
 }
