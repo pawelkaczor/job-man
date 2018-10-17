@@ -22,9 +22,9 @@ sealed trait JobExecutionTerminalEvent extends JobExecutionEvent {
   def dateTime: ZonedDateTime
 }
 
-case class JobExpired(jobId: String, jobType: JobType, compensation: String, dateTime: ZonedDateTime) extends JobExecutionTerminalEvent
+case class JobExpired(jobId: String, jobType: JobType, compensation: Option[String], dateTime: ZonedDateTime) extends JobExecutionTerminalEvent
 
-case class JobTerminated(jobId: String, jobType: JobType, queueId: Int, compensation: String, dateTime: ZonedDateTime)
+case class JobTerminated(jobId: String, jobType: JobType, queueId: Int, compensation: Option[String], dateTime: ZonedDateTime)
     extends JobExecutionTerminalEvent
 
 sealed trait JobEnded extends JobExecutionTerminalEvent {

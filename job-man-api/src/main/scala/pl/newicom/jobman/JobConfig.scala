@@ -6,7 +6,7 @@ trait JobConfig {
   def jobParamsClass: Class[JobParameters]
   def maxDuration: Duration
   def maxTaskDuration: Duration
-  def onJobExpiredAction: String
-  def onJobTerminatedAction: String
+  def onJobExpiredAction: Option[String]
+  def onJobTerminatedAction: Option[String]
   def notifyOnSuccess: Boolean
 }

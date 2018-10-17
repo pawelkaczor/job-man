@@ -119,15 +119,15 @@ class JobSchedulingCommandHandler(ctx: ActorContext[JobScheduleCommand],
     currEvts ++ newEvts
   }
 
-  def jobExpiredOrTerminated(schedule: State, jobId: String, compensation: String): List[Event] =
+  def jobExpiredOrTerminated(schedule: State, jobId: String, compensation: Option[String]): List[Event] =
     schedule
       .entry(jobId)
       .map(entry => {
         compensation match {
-          case Reschedule =>
+          case Some(Reschedule) =>
             val events = jobEntryRemoved(schedule, jobId)
             events ++ jobScheduled(after(schedule, events), entry.job)
-          case Retry =>
+          case Some(Retry) =>
             jobDispatchedForExecution(Some(entry))
           case _ =>
             jobEntryRemoved(schedule, jobId)
