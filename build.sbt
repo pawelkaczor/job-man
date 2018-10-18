@@ -34,6 +34,7 @@ lazy val `job-man-api` = project
 lazy val `job-scheduling-policy` = project
   .settings(
     commonSettings,
+    libraryDependencies ++= Seq(scalaTest % "test")
   ).dependsOn(`job-man-api`)
 
 lazy val `job-man-core` = project

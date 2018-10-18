@@ -2,7 +2,7 @@ package pl.newicom.jobman.schedule
 
 import pl.newicom.jobman.schedule.JobSchedule._
 import pl.newicom.jobman.schedule.event.{EquivalentJobFound, JobAddedToWaitingList, JobScheduleEntryAdded, JobSchedulingResult}
-import pl.newicom.jobman.{Job, JobParameters, JobType, JobConfigRegistry}
+import pl.newicom.jobman.{Job, JobParameters, JobType}
 
 object JobSchedule {
 
@@ -19,129 +19,6 @@ object JobSchedule {
     def waitingList: List[Job]
   }
 
-  trait StateQueries {
-    def state: State
-
-    def queues: Map[Int, List[Entry]] =
-      state.queues.withDefaultValue(List.empty)
-
-    def emptyQueues: Map[Int, List[Entry]] =
-      queues.filter(_._2.isEmpty)
-
-    def waitingList: List[Job] =
-      state.waitingList
-
-    def entry(jobId: String): Option[Entry] =
-      entries(_.jobId == jobId).headOption
-
-    def entries(queueId: Int): List[Entry] =
-      queues(queueId)
-
-    def entries(entryPredicate: Entry => Boolean): Iterable[Entry] =
-      queues.values.flatten.filter(entryPredicate)
-
-    def queueExists(queueId: Int): Boolean =
-      queues.contains(queueId)
-
-    def queueLength(queueId: Int): Int =
-      queues(queueId).size
-
-    def waitingListLength: Int =
-      waitingList.size
-
-    def notEmptyQueuesNumber: Int =
-      queues.filterNot(_._2.isEmpty).size
-
-    def queueWithTheLowestNrOfEnqueuedJobs: Option[Int] =
-      queues
-        .map { case (qId, es) => (qId, es.size) }
-        .toSeq
-        .sortBy(_._2)
-        .map(_._1)
-        .headOption
-
-    def awaitingJob(jobId: String): Option[Job] =
-      waitingList.find(_.id == jobId)
-
-    def jobsNumber: Int =
-      queues.values.flatten.size + waitingList.size
-  }
-
 }
 
-case class JobSchedule(state: State, config: JobSchedulingConfig, jobConfigRegistry: JobConfigRegistry) extends StateQueries {
-
-  def enqueueDefault(job: Job): JobSchedulingResult = {
-    (if (notEmptyQueuesNumber < config.getMinQueues)
-       enqueueInNewQueue(job)
-     else {
-       queueWithTheLowestNrOfEnqueuedJobs
-         .filter(qId => queueLength(qId) < config.getQueueCapacity)
-         .map(enqueueLast(job, _))
-         .orElse(enqueueInNewQueue(job))
-     }).getOrElse(copy(config = config.withQueueCapacityBumped).enqueueDefault(job))
-  }
-
-  def enqueueLast(job: Job, queueId: Int): JobSchedulingResult =
-    JobScheduleEntryAdded(job, queueId, queueLength(queueId))
-
-  def enqueueBefore(job: Job, queueId: Int, dependentJobId: String): JobScheduleEntryAdded =
-    entries(queueId).zipWithIndex
-      .find(_._1.jobId == dependentJobId)
-      .map(p => JobScheduleEntryAdded(job, queueId, p._2))
-      .get
-
-  def enqueueAfter[T <: JobParameters](job: Job, predicate: ParamsPredicate[T]): Option[JobSchedulingResult] =
-    enqueueAfter(job, e => {
-      e.jobType == job.jobType && predicate(job.params.asInstanceOf[T], e.jobParams.asInstanceOf[T])
-    })
-
-  @SafeVarargs
-  def enqueueAfter(job: Job, predicates: ParamsPredicate[JobParameters]*): Option[JobSchedulingResult] = {
-    val entryPredicates =
-      predicates.map(p => (e: Entry) => p(job.params, e.jobParams))
-
-    val results = entryPredicates.flatMap(p => enqueueAfter(job, p).toList)
-    if (results.isEmpty)
-      None
-    else if (results.size == 1)
-      Option(results.head)
-    else
-      results.find(_.isInstanceOf[JobAddedToWaitingList]).orElse {
-        val queues: Set[Int] = results
-          .filter(_.isInstanceOf[JobScheduleEntryAdded])
-          .map(_.asInstanceOf[JobScheduleEntryAdded])
-          .groupBy(_.queueId)
-          .keySet
-
-        enqueueLast(job, queues)
-      }
-  }
-
-  def rejectIfEquivalentJobEnqueued(job: Job): Option[JobSchedulingResult] =
-    entries(e => e.jobType == job.jobType && (e.jobId == job.id || e.jobParams == job.params)).headOption
-      .map(e => EquivalentJobFound(job.id, e.jobId))
-
-  private def enqueueInNewQueue(job: Job): Option[JobSchedulingResult] =
-    nextQueueId.map(JobScheduleEntryAdded(job, _, 0))
-
-  private def enqueueLast(job: Job, queues: Set[Int]): Option[JobSchedulingResult] =
-    if (queues.isEmpty)
-      None
-    else if (queues.size == 1)
-      Option(enqueueLast(job, queues.head))
-    else if (awaitingJob(job.id).isDefined)
-      None
-    else
-      Option(JobAddedToWaitingList(job, waitingListLength))
-
-  private def enqueueAfter(job: Job, entryPredicate: Entry => Boolean): Option[JobSchedulingResult] =
-    enqueueLast(job, entries(entryPredicate).groupBy(_.queueId).keySet)
-
-  private def nextQueueId: Option[Int] =
-    emptyQueues.keys.headOption.orElse {
-      val notEmptyNum = notEmptyQueuesNumber
-      if (notEmptyNum < config.getMaxQueues) Some(notEmptyNum + 1) else None
-    }
-
-}
+case class JobSchedule(state: State) extends JobScheduleOps with JobScheduleQueries

@@ -58,7 +58,7 @@ class JobSchedulingCommandHandler(ctx: ActorContext[JobScheduleCommand],
     command match {
 
       case cmd @ ScheduleJob(job, _) =>
-        persist(jobScheduled(schedule, job)).thenRun {
+        persist(jobScheduled(job, schedule, config)).thenRun {
           case result: JobSchedulingResult => cmd.replyTo ! result
         }
 
@@ -99,8 +99,8 @@ class JobSchedulingCommandHandler(ctx: ActorContext[JobScheduleCommand],
         Effect.stop
     }
 
-  def jobScheduled(schedule: State, job: Job): List[Event] =
-    schedulingPolicy.scheduleJob(job, schedule) match {
+  def jobScheduled(job: Job, schedule: State, config: JobSchedulingConfig): List[Event] =
+    schedulingPolicy.apply(job, schedule, config) match {
       case event: JobScheduleEntryAdded if event.position == 0 =>
         List(event, JobDispatchedForExecution(job, event.queueId))
       case event =>
@@ -114,7 +114,7 @@ class JobSchedulingCommandHandler(ctx: ActorContext[JobScheduleCommand],
         val (currentEvents, newEvents, currentState) = t
 
         val newState = after(currentState, newEvents)
-        (currentEvents ++ newEvents, jobScheduled(newState, awaitingJob), newState)
+        (currentEvents ++ newEvents, jobScheduled(awaitingJob, newState, config), newState)
       })
     currEvts ++ newEvts
   }
@@ -126,7 +126,7 @@ class JobSchedulingCommandHandler(ctx: ActorContext[JobScheduleCommand],
         compensation match {
           case Some(Reschedule) =>
             val events = jobEntryRemoved(schedule, jobId)
-            events ++ jobScheduled(after(schedule, events), entry.job)
+            events ++ jobScheduled(entry.job, after(schedule, events), config)
           case Some(Retry) =>
             jobDispatchedForExecution(Some(entry))
           case _ =>
@@ -142,7 +142,7 @@ class JobSchedulingCommandHandler(ctx: ActorContext[JobScheduleCommand],
   def withOffsetChanged(cmd: HasExecutionJournalOffset, events: List[Event]): List[Event] =
     events.+:(ExecutionJournalOffsetChanged(cmd.executionJournalOffset + 1))
 
-  private implicit def state2Schedule(state: JobScheduleState): JobSchedule =
-    JobSchedule(state, config, null)
+  private implicit def state2ScheduleOps(state: JobScheduleState): JobSchedule =
+    JobSchedule(state)
 
 }

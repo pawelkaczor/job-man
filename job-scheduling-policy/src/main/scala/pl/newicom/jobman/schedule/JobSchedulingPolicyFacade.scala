@@ -4,5 +4,5 @@ import pl.newicom.jobman.Job
 import pl.newicom.jobman.schedule.event.JobSchedulingResult
 
 class JobSchedulingPolicyFacade extends JobSchedulingPolicy {
-  def scheduleJob(job: Job, schedule: JobSchedule): JobSchedulingResult = ???
+  def apply(job: Job, schedule: JobSchedule, config: JobSchedulingConfig): JobSchedulingResult = ???
 }

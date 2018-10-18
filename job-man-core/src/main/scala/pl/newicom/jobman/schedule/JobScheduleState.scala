@@ -10,7 +10,7 @@ case class JobScheduleState(override val queues: Map[Int, List[Entry]] = Map.emp
                             override val waitingList: List[Job] = List.empty,
                             executionJournalOffset: Long = 1L)
     extends JobSchedule.State
-    with JobSchedule.StateQueries {
+    with JobScheduleQueries {
 
   def state: JobSchedule.State = this
 

@@ -1,11 +1,8 @@
 package pl.newicom.jobman.schedule
 
-trait JobSchedulingConfig {
-  def getMinQueues: Int
+case class JobSchedulingConfig(minQueues: Int, maxQueues: Int, queueCapacity: Int) {
 
-  def getMaxQueues: Int
+  def withQueueCapacityBumped: JobSchedulingConfig =
+    copy(queueCapacity = queueCapacity + 1)
 
-  def getQueueCapacity: Int
-
-  def withQueueCapacityBumped: JobSchedulingConfig
 }

@@ -1,8 +1,8 @@
 package pl.newicom.jobman.execution
 
-import pl.newicom.jobman.JobType
+import pl.newicom.jobman.{JobConfigRegistry, JobType}
 
-trait JobExecutionConfig {
-  def maxWorkers: Int
-  def parallelism(jobType: JobType): Int
+case class JobExecutionConfig(maxWorkers: Int, jobConfigRegistry: JobConfigRegistry) {
+  def parallelism(jobType: JobType, defaultValue: Int): Int =
+    jobConfigRegistry.jobConfig(jobType).parallelism.getOrElse(defaultValue)
 }
