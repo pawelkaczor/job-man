@@ -1,15 +1,18 @@
 package pl.newicom.jobman.schedule
 
+import akka.actor.ActorRef
 import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.persistence.typed.scaladsl.{Effect, PersistentBehaviors}
 import akka.stream.typed.scaladsl.ActorSink
 import pl.newicom.jobman._
+import pl.newicom.jobman.cache.JobCache.AddJob
 import pl.newicom.jobman.execution.JobExecution.jobExecutionReportSource
 import pl.newicom.jobman.execution.event.{JobExpired, JobTerminated}
 import pl.newicom.jobman.schedule.CompensatingAction.{Reschedule, Retry}
 import pl.newicom.jobman.schedule.JobScheduling.EventHandler
 import pl.newicom.jobman.schedule.command.{CancelJob, JobScheduleCommand, ScheduleJob}
+import pl.newicom.jobman.schedule.error.{JobAlreadyDispatchedForExecution, JobNotFound}
 import pl.newicom.jobman.schedule.event._
 import pl.newicom.jobman.shared.command._
 import pl.newicom.jobman.shared.event.ExecutionJournalOffsetChanged
@@ -18,7 +21,7 @@ object JobScheduling {
 
   val JobSchedulingJournalId = "JobSchedule"
 
-  def behavior(policy: JobSchedulingPolicy, config: JobSchedulingConfig)(implicit jm: JobMan): Behavior[JobScheduleCommand] =
+  def behavior(policy: JobSchedulingPolicy)(implicit jm: JobMan): Behavior[JobScheduleCommand] =
     Behaviors.setup(ctx => {
 
       def recoveryHandler(schedule: JobScheduleState): Unit = {
@@ -33,7 +36,7 @@ object JobScheduling {
         .receive(
           persistenceId = JobSchedulingJournalId,
           emptyState = JobScheduleState(),
-          commandHandler = new JobSchedulingCommandHandler(ctx, policy, config, eventHandler),
+          commandHandler = new JobSchedulingCommandHandler(ctx, policy, jm.config.schedulingConfig, eventHandler),
           eventHandler
         )
         .onRecoveryCompleted(recoveryHandler)
@@ -51,15 +54,19 @@ object JobScheduling {
 class JobSchedulingCommandHandler(ctx: ActorContext[JobScheduleCommand],
                                   schedulingPolicy: JobSchedulingPolicy,
                                   config: JobSchedulingConfig,
-                                  eventHandler: EventHandler)
+                                  eventHandler: EventHandler)(implicit jm: JobMan)
     extends EventSourcedCommandHandler[JobScheduleCommand, JobScheduleEvent, JobScheduleState](ctx, eventHandler) {
 
   def apply(schedule: State, command: Command): Effect[Event, State] =
     command match {
 
       case cmd @ ScheduleJob(job, _) =>
-        persist(jobScheduled(job, schedule, config)).thenRun {
-          case result: JobSchedulingResult => cmd.replyTo ! result
+        persist(jobScheduled(job, schedule, config)).thenForEachRun {
+          case result: JobSchedulingResult =>
+            cmd.replyTo ! result
+            if (result.isInstanceOf[JobAccepted]) {
+              jm.jobCache ! AddJob(job.id, job.params)
+            }
         }
 
       case cmd @ CancelJob(jobId, _) =>

@@ -33,7 +33,7 @@ object JobExecution {
 
   val overrunningJobsCheckoutInterval: FiniteDuration = 5.seconds
 
-  def behavior(config: JobExecutionConfig)(implicit jm: JobMan): Behavior[JobExecutionCommand] =
+  def behavior(implicit jm: JobMan): Behavior[JobExecutionCommand] =
     withTimers(scheduler => {
       scheduler.startPeriodicTimer("TickKey", ExpireOverrunningJobs, overrunningJobsCheckoutInterval)
       setup(ctx => {
@@ -88,13 +88,11 @@ object JobExecution {
     case (s, e) => s.apply(e)
   }
 
-  def jobExecutionReportSource(journalOffset: Long, filter: JobExecutionTerminalEvent => Boolean = _ => true)(
-      implicit jm: JobMan): Source[JobExecutionReport, NotUsed] =
+  def jobExecutionReportSource(journalOffset: Long)(implicit jm: JobMan): Source[JobExecutionReport, NotUsed] =
     jm.readJournal
       .eventsByPersistenceId(JobExecutionJournalId, journalOffset, Long.MaxValue)
       .filter(envelope => envelope.event.isInstanceOf[JobExecutionTerminalEvent])
       .map(envelope => (envelope.event.asInstanceOf[JobExecutionTerminalEvent], envelope.sequenceNr))
-      .filter { case (event, _) => filter(event) }
       .map { case (event, offset) => JobExecutionReport(event, offset) }
 
 }
@@ -107,9 +105,9 @@ class JobExecutionCommandHandler(ctx: ActorContext[JobExecutionCommand], eventHa
 
       case cmd @ StartJob(job, queueId, _) =>
         val jobExecutionId = UUID.randomUUID().toString
-        persist(jobStarted(cmd, queueId, jobExecutionId, job)).andThen(SideEffect[State](_ => {
+        persist(jobStarted(cmd, queueId, jobExecutionId, job)).thenRun(_ => {
           WorkerOffice.worker(queueId) ! ExecuteJob(queueId, jobExecutionId, job, ctx.self)
-        }))
+        })
 
       case cmd: JobExecutionResult =>
         persist(jobEnded(state, cmd))

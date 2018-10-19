@@ -1,10 +1,8 @@
 package pl.newicom.jobman.schedule
-import pl.newicom.jobman.{Job, JobParameters, JobType}
+import pl.newicom.jobman.{Job, JobParameters}
 
 object TestJob {
-  object TestJobType extends JobType {
-    override def toString: String = "Test"
-  }
+  val TestJobType = "Test"
 
   def testJob(jobId: String): Job =
     Job(jobId, TestJobType, new AnyRef with JobParameters {

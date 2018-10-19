@@ -8,6 +8,14 @@ import akka.cluster.sharding.typed.scaladsl.ClusterSharding
 import akka.persistence.query.scaladsl.EventsByPersistenceIdQuery
 import akka.stream.ActorMaterializer
 
+object JobMan {
+  object Role {
+    val backend  = "backend"
+    val frontend = "frontend"
+    val worker   = "worker"
+  }
+}
+
 trait JobMan {
 
   def clock: Clock

@@ -3,7 +3,8 @@ package pl.newicom.jobman.schedule.command
 import akka.actor.ActorRef
 import akka.actor.typed.scaladsl.adapter._
 import pl.newicom.jobman.Job
-import pl.newicom.jobman.schedule.event.{JobCancellationResult, JobSchedulingResult}
+import pl.newicom.jobman.schedule.JobCancellationResult
+import pl.newicom.jobman.schedule.event.JobSchedulingResult
 
 trait JobScheduleCommand
 

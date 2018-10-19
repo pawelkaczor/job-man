@@ -21,7 +21,7 @@ abstract class EventSourcedCommandHandler[C, E, S](ctx: ActorContext[C], eventHa
   }
 
   case class Events2Persist[EE <: E](events: List[EE], callback: EE => Unit = (_: EE) => ()) {
-    def thenRun(c: PartialFunction[EE, Unit]): Effect[E, S] =
+    def thenForEachRun(c: PartialFunction[EE, Unit]): Effect[E, S] =
       toEffect(copy(callback = (e: EE) => c.applyOrElse(e, callback)))
   }
 
