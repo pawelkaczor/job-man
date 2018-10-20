@@ -64,7 +64,7 @@ class JobManInfraServices(val readJournal: EventsByPersistenceIdQuery, cluster: 
 
   lazy val schedulingConfig: JobSchedulingConfig = {
     val c = _config.getConfig(path("scheduling"))
-    JobSchedulingConfig(c.getInt("minQueues"), c.getInt("maxQueues"), c.getInt("queueCapacity"))
+    JobSchedulingConfig(c.getInt("minQueues"), c.getInt("maxQueues"), c.getInt("queueCapacity"), jobConfigRegistry.jobType2ParamMap)
   }
 
   lazy val executionConfig: JobExecutionConfig = {

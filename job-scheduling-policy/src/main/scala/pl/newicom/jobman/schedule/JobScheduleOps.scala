@@ -21,7 +21,7 @@ trait JobScheduleOps {
     })
 
   @SafeVarargs
-  def enqueueAfter(job: Job, predicates: ParamsPredicate[JobParameters]*): Option[JobSchedulingResult] = {
+  def enqueueAfterAll(job: Job)(predicates: ParamsPredicate[JobParameters]*): Option[JobSchedulingResult] = {
     val entryPredicates =
       predicates.map(p => (e: Entry) => p(job.params, e.jobParams))
 

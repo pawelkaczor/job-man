@@ -4,12 +4,12 @@ import pl.newicom.jobman.schedule.event.JobSchedulingResult
 
 class DefaultJobSchedulingPolicy extends JobSchedulingPolicy {
 
-  def apply(job: Job, schedule: JobSchedule, config: JobSchedulingConfig): JobSchedulingResult =
+  def apply(job: Job, schedule: JobSchedule)(implicit config: JobSchedulingConfig): JobSchedulingResult =
     schedule
       .rejectIfEquivalentJobEnqueued(job)
-      .getOrElse(scheduleJob(job, schedule, config))
+      .getOrElse(scheduleJob(job, schedule))
 
-  private def scheduleJob(job: Job, schedule: JobSchedule, config: JobSchedulingConfig): JobSchedulingResult = {
+  private def scheduleJob(job: Job, schedule: JobSchedule)(implicit config: JobSchedulingConfig): JobSchedulingResult = {
     (if (schedule.notEmptyQueuesNumber < config.minQueues)
        schedule.enqueueInNewQueue(job, config.maxQueues)
      else {
@@ -17,7 +17,7 @@ class DefaultJobSchedulingPolicy extends JobSchedulingPolicy {
          .filter(qId => schedule.queueLength(qId) < config.queueCapacity)
          .map(schedule.enqueueLast(job, _))
          .orElse(schedule.enqueueInNewQueue(job, config.maxQueues))
-     }).getOrElse(scheduleJob(job, schedule, config.withQueueCapacityBumped))
+     }).getOrElse(scheduleJob(job, schedule)(config.withQueueCapacityBumped))
   }
 
 }

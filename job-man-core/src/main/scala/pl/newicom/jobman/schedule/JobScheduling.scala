@@ -107,7 +107,7 @@ class JobSchedulingCommandHandler(ctx: ActorContext[JobScheduleCommand],
     }
 
   def jobScheduled(job: Job, schedule: State, config: JobSchedulingConfig): List[Event] =
-    schedulingPolicy.apply(job, schedule, config) match {
+    schedulingPolicy.apply(job, schedule)(config) match {
       case event: JobScheduleEntryAdded if event.position == 0 =>
         List(event, JobDispatchedForExecution(job, event.queueId))
       case event =>
