@@ -12,7 +12,8 @@ import scala.concurrent.Future
 sealed trait JobNotificationMessageFactory
 
 trait JavaJobNotificationMessageFactory extends JobNotificationMessageFactory {
-  def apply(result: JobExecutionTerminalEvent, jobParamsSupplier: Supplier[CompletionStage[Optional[JobParameters]]]): List[CompletionStage[NotificationMsg]]
+  def apply(result: JobExecutionTerminalEvent,
+            jobParamsSupplier: Supplier[CompletionStage[Optional[JobParameters]]]): List[CompletionStage[NotificationMsg]]
 }
 
 trait ScalaJobNotificationMessageFactory extends JobNotificationMessageFactory {

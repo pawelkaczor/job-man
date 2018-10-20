@@ -4,7 +4,7 @@ object Deps {
 
   object Version {
     val Akka              = "2.5.17"
-    val AkkaHttp          = "10.0.13"
+    val AkkaHttp          = "10.1.5"
 
     val Slick              = "3.2.3"
     val PostgresqlSlickExt = "0.16.2" // Slick 3.2.3
@@ -38,8 +38,8 @@ object Deps {
 
   object AkkaHttp {
     val httpCore    = apply("http")
+    val jackson     = "de.heikoseeberger" %% "akka-http-jackson" % "1.22.0"
     val httpTestKit = apply("http-testkit")
-    val all         = Seq(httpCore, httpTestKit)
 
     private def apply(moduleName: String) = "com.typesafe.akka" %% s"akka-$moduleName" % Version.AkkaHttp
   }

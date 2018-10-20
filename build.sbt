@@ -20,7 +20,7 @@ licenses          in ThisBuild := ("MIT", new URL("http://raw.githubusercontent.
 sonatypeProfileName := "pl.newicom"
 
 lazy val root = (project in file("."))
-  .aggregate(`job-man-api`, `job-scheduling-policy`, `job-man-core`)
+  .aggregate(`job-man-api`, `job-scheduling-policy`, `job-man-core`, `job-man-rest`)
   .settings(
     commonSettings,
     publishArtifact := false
@@ -28,7 +28,8 @@ lazy val root = (project in file("."))
 
 lazy val `job-man-api` = project
   .settings(
-    commonSettings
+    commonSettings,
+    libraryDependencies ++= Seq(Akka.actorTyped)
   )
 
 lazy val `job-scheduling-policy` = project
@@ -43,6 +44,11 @@ lazy val `job-man-core` = project
     libraryDependencies ++= Seq(Akka.persistenceTyped, Akka.persistenceQuery, Akka.streamTyped, Akka.clusterShardingTyped, Akka.slf4j, scalaTest % "test")
   ).dependsOn(`job-scheduling-policy`)
 
+lazy val `job-man-rest` = project
+  .settings(
+    commonSettings,
+    libraryDependencies ++= Seq(AkkaHttp.httpCore, AkkaHttp.jackson)
+  ).dependsOn(`job-man-api`)
 
 lazy val commonSettings: Seq[Setting[_]] = Publish.settings ++ Seq(
   licenses := Seq("MIT" -> url("http://raw.github.com/pawelkaczor/job-man/master/LICENSE.md")),
