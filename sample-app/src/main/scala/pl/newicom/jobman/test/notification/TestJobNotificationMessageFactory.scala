@@ -1,9 +1,10 @@
-package pl.newicom.jobman.test
+package pl.newicom.jobman.test.notification
 
 import pl.newicom.jobman.{JobParameters, JobType}
 import pl.newicom.jobman.execution.event._
 import pl.newicom.jobman.notification.{NotificationMsg, ScalaJobNotificationMessageFactory}
-import pl.newicom.jobman.test.TestJobParameters.TestJobType
+import pl.newicom.jobman.test.job.TestJobParameters
+import pl.newicom.jobman.test.job.TestJobParameters.TestJobType
 
 import scala.concurrent.{ExecutionContext, Future}
 

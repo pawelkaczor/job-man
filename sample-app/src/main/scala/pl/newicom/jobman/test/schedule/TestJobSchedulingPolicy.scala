@@ -1,9 +1,10 @@
-package pl.newicom.jobman.test
+package pl.newicom.jobman.test.schedule
 
-import pl.newicom.jobman.{Job, JobParameters}
 import pl.newicom.jobman.schedule.JobSchedule.ParamsPredicate
 import pl.newicom.jobman.schedule._
 import pl.newicom.jobman.schedule.event.JobSchedulingResult
+import pl.newicom.jobman.test.job.TestJobParameters
+import pl.newicom.jobman.{Job, JobParameters}
 
 class TestJobSchedulingPolicy extends JobSchedulingPolicy with JobTypeSpecificSchedulingPolicy[TestJobParameters] {
 

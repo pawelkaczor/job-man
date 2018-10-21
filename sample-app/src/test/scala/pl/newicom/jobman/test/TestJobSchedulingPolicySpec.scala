@@ -4,7 +4,9 @@ import org.scalatest.WordSpec
 import pl.newicom.jobman.Job
 import pl.newicom.jobman.schedule.event.JobAddedToWaitingList
 import pl.newicom.jobman.schedule.{JobSchedule, JobSchedulingConfig}
-import pl.newicom.jobman.test.TestJobParameters.TestJobType
+import pl.newicom.jobman.test.job.TestJobParameters
+import pl.newicom.jobman.test.job.TestJobParameters.TestJobType
+import pl.newicom.jobman.test.schedule.TestJobSchedulingPolicy
 
 class TestJobSchedulingPolicySpec extends WordSpec {
 

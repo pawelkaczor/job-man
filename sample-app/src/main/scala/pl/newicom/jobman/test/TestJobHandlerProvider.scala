@@ -2,6 +2,7 @@ package pl.newicom.jobman.test
 import pl.newicom.jobman.JobType
 import pl.newicom.jobman.handler.{AbstractJobHandler, JobHandlerProvider}
 import pl.newicom.jobman.test.ThreadPoolExecutorFactory.threadPoolExecutor
+import pl.newicom.jobman.test.job.TestJobHandler
 
 import scala.concurrent.ExecutionContext
 

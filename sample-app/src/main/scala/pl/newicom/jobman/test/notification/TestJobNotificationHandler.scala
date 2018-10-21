@@ -1,4 +1,5 @@
-package pl.newicom.jobman.test
+package pl.newicom.jobman.test.notification
+
 import pl.newicom.jobman.notification.{NotificationMsg, ScalaJobNotificationHandler}
 
 import scala.concurrent.{ExecutionContext, Future}

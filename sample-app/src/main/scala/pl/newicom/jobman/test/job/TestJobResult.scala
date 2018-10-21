@@ -1,7 +1,8 @@
-package pl.newicom.jobman.test
+package pl.newicom.jobman.test.job
+
 import pl.newicom.jobman.JobType
 import pl.newicom.jobman.execution.result.{JobFailure, SuccessfulJobResult}
-import pl.newicom.jobman.test.TestJobParameters.TestJobType
+import pl.newicom.jobman.test.job.TestJobParameters.TestJobType
 
 case class TestJobResult(jobId: String, report: String) extends SuccessfulJobResult {
   def jobType: JobType = TestJobType

@@ -1,4 +1,5 @@
-package pl.newicom.jobman.test
+package pl.newicom.jobman.test.job
+
 import pl.newicom.jobman.Job
 import pl.newicom.jobman.execution.result.JobResult
 import pl.newicom.jobman.handler.VanillaScalaJobHandler

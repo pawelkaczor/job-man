@@ -1,4 +1,4 @@
-package pl.newicom.jobman.test
+package pl.newicom.jobman.test.job
 
 import pl.newicom.jobman.JobParameters
 
