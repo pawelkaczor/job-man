@@ -2,7 +2,7 @@ package pl.newicom.jobman
 
 import java.time.Duration
 
-case class JobConfig(jobParamsClass: Class[JobParameters],
+case class JobConfig(jobParamsClass: Class[_ <: JobParameters],
                      parallelism: Option[Int],
                      maxDuration: Duration,
                      maxTaskDuration: Duration,
