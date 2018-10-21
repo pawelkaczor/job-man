@@ -29,7 +29,7 @@ object Notification {
   val checkoutInterval: FiniteDuration = 1.minutes
   val cacheAskTimeout: FiniteDuration  = 3.seconds
 
-  def behavior(jobNotificationMessageFactory: JobNotificationMessageFactory, jobNotificationSender: JobNotificationSender)(
+  def behavior(jobNotificationMessageFactory: JobNotificationMessageFactory, jobNotificationHandler: JobNotificationHandler)(
       implicit jm: JobMan): Behavior[NotificationCommand] =
     withTimers(scheduler => {
       scheduler.startPeriodicTimer("TickKey", SendAwaitingNotifications, checkoutInterval)
@@ -64,7 +64,7 @@ object Notification {
           .receive(
             persistenceId = NotificationJournalId,
             emptyState = NotificationState(),
-            commandHandler = new NotificationCommandHandler(ctx, eventHandler, jobNotificationSender, jobNotificationMessageFactory),
+            commandHandler = new NotificationCommandHandler(ctx, eventHandler, jobNotificationHandler, jobNotificationMessageFactory),
             eventHandler = eventHandler
           )
           .onRecoveryCompleted(recoveryHandler)
@@ -82,19 +82,19 @@ object Notification {
 
 class NotificationCommandHandler(ctx: ActorContext[NotificationCommand],
                                  eventHandler: EventHandler,
-                                 notificationSender: JobNotificationSender,
+                                 notificationHandler: JobNotificationHandler,
                                  notificationFactory: JobNotificationMessageFactory)(implicit jm: JobMan)
     extends EventSourcedCommandHandler[NotificationCommand, NotificationEvent, NotificationState](ctx, eventHandler) {
 
   def apply(state: State, command: Command): Effect[Event, State] = command match {
     case cmd @ JobExecutionReport(result, _) =>
       persist(withOffsetChanged(cmd, NotificationRequested(cmd.jobId, result)))
-        .thenRun(_ => sendNotification(cmd.jobId, result))
+        .thenRun(_ => handleNotification(cmd.jobId, result))
 
     case SendAwaitingNotifications =>
       Effect.none.thenRun(_.awaitingNotifications.foreach {
         case (jobId, result) =>
-          sendNotification(jobId, result)
+          handleNotification(jobId, result)
       })
 
     case AcknowledgeNotificationSent(jobId) =>
@@ -111,10 +111,10 @@ class NotificationCommandHandler(ctx: ActorContext[NotificationCommand],
   def withOffsetChanged(cmd: HasExecutionJournalOffset, event: NotificationEvent): List[NotificationEvent] =
     List(ExecutionJournalOffsetChanged(cmd.executionJournalOffset + 1), event)
 
-  def sendNotification(jobId: String, result: JobExecutionTerminalEvent): Unit = {
+  def handleNotification(jobId: String, result: JobExecutionTerminalEvent): Unit = {
     import ctx.executionContext
     notificationMessages(jobId, result).foreach { msg =>
-      sendNotification(msg).onComplete {
+      handleNotification(msg).onComplete {
         case Success(_) =>
           ctx.self ! AcknowledgeNotificationSent(jobId)
         case Failure(ex) =>
@@ -123,10 +123,10 @@ class NotificationCommandHandler(ctx: ActorContext[NotificationCommand],
     }
   }
 
-  def sendNotification(msgFuture: Future[NotificationMsg]): Future[Any] =
-    notificationSender match {
-      case ns: JavaJobNotificationSender  => ns(msgFuture.toJava).toScala
-      case ns: ScalaJobNotificationSender => ns(msgFuture)
+  def handleNotification(msgFuture: Future[NotificationMsg]): Future[Any] =
+    notificationHandler match {
+      case ns: JavaJobNotificationHandler  => ns(msgFuture.toJava).toScala
+      case ns: ScalaJobNotificationHandler => ns(msgFuture)
     }
 
   def notificationMessages(jobId: String, result: JobExecutionTerminalEvent): List[Future[NotificationMsg]] = {

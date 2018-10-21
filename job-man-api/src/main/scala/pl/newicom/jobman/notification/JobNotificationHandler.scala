@@ -4,12 +4,12 @@ import java.util.concurrent.CompletionStage
 
 import scala.concurrent.Future
 
-trait JobNotificationSender
+trait JobNotificationHandler
 
-trait JavaJobNotificationSender extends JobNotificationSender {
+trait JavaJobNotificationHandler extends JobNotificationHandler {
   def apply(msgFuture: CompletionStage[NotificationMsg]): CompletionStage[Void]
 }
 
-trait ScalaJobNotificationSender extends JobNotificationSender {
+trait ScalaJobNotificationHandler extends JobNotificationHandler {
   def apply(msgFuture: Future[NotificationMsg]): Future[Unit]
 }

@@ -7,7 +7,6 @@ import pl.newicom.jobman.JobType
 trait JobFailure extends JobResult {
   def jobId: String
   def jobType: JobType
-  def summary: String
   def report: String
 
   override def isSuccess: Boolean = false
