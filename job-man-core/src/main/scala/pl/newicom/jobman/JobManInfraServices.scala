@@ -25,7 +25,7 @@ import scala.collection.JavaConverters._
 object JobManInfraServices {
   lazy val log: Logger = LoggerFactory.getLogger(classOf[JobManInfraServices])
 
-  val rootPath = "job-man"
+  val rootPath = "jm"
 
   def path(path: String): String = joinPath(rootPath, path)
 
@@ -37,12 +37,20 @@ object JobManInfraServices {
         None
       }
 
+    def getOptionalString(path: String): Option[String] =
+      if (underlying.hasPath(path)) {
+        Some(underlying.getString(path))
+      } else {
+        None
+      }
+
     def getOptionalInt(path: String): Option[Int] =
       if (underlying.hasPath(path)) {
         Some(underlying.getInt(path))
       } else {
         None
       }
+
   }
 }
 
@@ -52,10 +60,13 @@ class JobManInfraServices(val readJournal: EventsByPersistenceIdQuery, cluster: 
   lazy val jobConfigRegistry: JobConfigRegistry = {
     def jobConfig(c: Config): JobConfig =
       JobConfig(
-        Class.forName(c.getString("jobParamsClass")).asInstanceOf[Class[JobParameters]],
+        Class.forName(c.getString("paramsClass")).asInstanceOf[Class[JobParameters]],
         c.getOptionalInt("parallelism"),
         c.getDuration("maxDuration"),
-        c.getDuration("maxTaskDuration")
+        c.getDuration("maxTaskDuration"),
+        c.getOptionalString("onJobExpiredAction"),
+        c.getOptionalString("onJobTerminatedAction"),
+        c.getOptionalBoolean("notifyOnSuccess").getOrElse(false)
       )
 
     val jobTypesConfig = _config.getConfig(path("job-types"))
@@ -68,8 +79,7 @@ class JobManInfraServices(val readJournal: EventsByPersistenceIdQuery, cluster: 
   }
 
   lazy val executionConfig: JobExecutionConfig = {
-    val c = _config.getConfig(path("execution"))
-    JobExecutionConfig(c.getInt("maxWorkers"), jobConfigRegistry)
+    JobExecutionConfig(jobConfigRegistry)
   }
 
   def actorMaterializer(errorMsg: String): ActorMaterializer = {

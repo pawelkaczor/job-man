@@ -1,3 +1,3 @@
 package pl.newicom.jobman
 
-trait JobParameters {}
+trait JobParameters
