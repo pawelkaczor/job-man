@@ -8,6 +8,8 @@ object Deps {
 
     val Jackson = "2.9.6"
 
+    val EventStoreAkkaJournal = "5.0.2"
+
     val Slick              = "3.2.3"
     val PostgresqlSlickExt = "0.16.2" // Slick 3.2.3
     val H2Driver           = "1.4.189"

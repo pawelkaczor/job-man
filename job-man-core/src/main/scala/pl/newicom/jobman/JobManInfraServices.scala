@@ -3,12 +3,14 @@ package pl.newicom.jobman
 import java.time.Clock
 
 import akka.actor.ActorRef
-import akka.actor.typed.ActorSystem
+import akka.actor.ActorSystem
 import akka.actor.typed.scaladsl.adapter._
 import akka.cluster.Cluster
 import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.sharding.typed.ClusterShardingSettings
 import akka.cluster.sharding.typed.scaladsl.ClusterSharding
+import akka.persistence.query.PersistenceQuery
+import akka.persistence.query.journal.leveldb.scaladsl.LeveldbReadJournal
 import akka.persistence.query.scaladsl.EventsByPersistenceIdQuery
 import akka.stream.typed.scaladsl
 import akka.stream.{ActorMaterializer, ActorMaterializerSettings, Supervision}
@@ -54,8 +56,7 @@ object JobManInfraServices {
   }
 }
 
-class JobManInfraServices(val readJournal: EventsByPersistenceIdQuery, cluster: Cluster, _config: Config)(implicit as: ActorSystem[Void])
-    extends JobMan {
+class JobManInfraServices(cluster: Cluster, _config: Config)(implicit as: ActorSystem) extends JobMan {
 
   lazy val jobConfigRegistry: JobConfigRegistry = {
     def jobConfig(c: Config): JobConfig =
@@ -84,12 +85,11 @@ class JobManInfraServices(val readJournal: EventsByPersistenceIdQuery, cluster: 
 
   def actorMaterializer(errorMsg: String): ActorMaterializer = {
     scaladsl.ActorMaterializer(
-      Some(
-        ActorMaterializerSettings(as.toUntyped)
-          .withSupervisionStrategy(ex => {
-            log.error(errorMsg, ex)
-            Supervision.stop
-          })))
+      Some(ActorMaterializerSettings(as)
+        .withSupervisionStrategy(ex => {
+          log.error(errorMsg, ex)
+          Supervision.stop
+        })))(as.toTyped)
   }
 
   lazy val config: JobManConfig = {
@@ -108,17 +108,19 @@ class JobManInfraServices(val readJournal: EventsByPersistenceIdQuery, cluster: 
     Clock.systemDefaultZone
 
   lazy val clusterSharding: ClusterSharding =
-    ClusterSharding(as)
+    ClusterSharding(as.toTyped)
 
   lazy val clusterShardingSettingsForWorkers: ClusterShardingSettings =
-    ClusterShardingSettings(as).withRole(JobMan.Role.worker)
+    ClusterShardingSettings(as.toTyped).withRole(JobMan.Role.worker)
 
   lazy val distributedPubSub: DistributedPubSubFacade =
-    new DistributedPubSubFacade(DistributedPubSub(as.toUntyped).mediator)
+    new DistributedPubSubFacade(DistributedPubSub(as).mediator)
 
   lazy val jobCache: ActorRef = {
-    val replicatedCache = as.toUntyped.actorOf(ReplicatedCache.props, "ReplicatedCache")
-    as.toUntyped.actorOf(JobCache.props(replicatedCache), "JobCache")
+    val replicatedCache = as.actorOf(ReplicatedCache.props, "ReplicatedCache")
+    as.actorOf(JobCache.props(replicatedCache), "JobCache")
   }
 
+  lazy val readJournal: EventsByPersistenceIdQuery =
+    PersistenceQuery(as).readJournalFor[LeveldbReadJournal](LeveldbReadJournal.Identifier)
 }

@@ -53,7 +53,7 @@ lazy val `job-man-rest` = project
 lazy val `sample-app` = project
   .settings(
     commonSettings,
-    libraryDependencies ++= Jackson() ++ Seq(slf4j_log4j, scalaTest % "test")
+    libraryDependencies ++= Jackson() ++ levelDB ++ Seq(slf4j_log4j, scalaTest % "test")
   ).dependsOn(`job-man-core`, `job-man-rest`)
 
 lazy val commonSettings: Seq[Setting[_]] = Publish.settings ++ Seq(
