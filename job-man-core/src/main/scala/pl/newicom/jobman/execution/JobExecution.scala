@@ -7,7 +7,6 @@ import akka.NotUsed
 import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.ActorContext
 import akka.actor.typed.scaladsl.Behaviors.{receiveMessage, same, setup, withTimers}
-import akka.persistence.typed.SideEffect
 import akka.persistence.typed.scaladsl.{Effect, PersistentBehaviors}
 import akka.stream.scaladsl.{Sink, Source}
 import akka.stream.typed.scaladsl.ActorSink
@@ -22,14 +21,13 @@ import pl.newicom.jobman.healthcheck.HealthCheckTopic
 import pl.newicom.jobman.healthcheck.event.WorkerStopped
 import pl.newicom.jobman.progress.ProgressTopic
 import pl.newicom.jobman.progress.event.JobProgressUpdated
-import pl.newicom.jobman.schedule.JobScheduling.JobSchedulingJournalId
+import pl.newicom.jobman.schedule.JobSchedulingJournalId
 import pl.newicom.jobman.schedule.event.JobDispatchedForExecution
 import pl.newicom.jobman.shared.command.{JobExecutionReport, QueueTerminationReport, Stop, StopDueToEventSubsriptionTermination}
 
 import scala.concurrent.duration._
 
 object JobExecution {
-  val JobExecutionJournalId = "JobExecution"
 
   val overrunningJobsCheckoutInterval: FiniteDuration = 5.seconds
 

@@ -57,6 +57,14 @@ object Deps {
 
   }
 
+  object Hibernate {
+    val hibernateCore          = "org.hibernate"                   % "hibernate-core"          % "4.3.11.Final"
+    val hibernateEntityManager = "org.hibernate"                   % "hibernate-entitymanager" % "4.3.11.Final"
+    val hibernateJPA           = "org.hibernate.javax.persistence" % "hibernate-jpa-2.0-api"   % "1.0.1.Final"
+
+    def apply() = Seq(hibernateCore, hibernateEntityManager, hibernateJPA)
+  }
+
   object SqlDb {
     val `slick-for-pg` = "com.github.tminglei" %% "slick-pg"       % Version.PostgresqlSlickExt exclude ("org.slf4j", "slf4j-simple")
     val connectionPool = "com.typesafe.slick"  %% "slick-hikaricp" % Version.Slick

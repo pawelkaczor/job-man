@@ -1,6 +1,5 @@
 package pl.newicom.jobman.test
 
-import java.util.Locale
 import java.util.concurrent.{Executors, ThreadFactory}
 import java.util.concurrent.atomic.AtomicLong
 
@@ -26,7 +25,7 @@ object ThreadFactoryBuilder {
         thread
       }
   }
-  private def format(format: String, args: Any*) = String.format(Locale.ROOT, format, args)
+  private def format(format: String, arg: Any) = format.format(arg)
 }
 
 final class ThreadFactoryBuilder() {

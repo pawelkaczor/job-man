@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence version="2.0"
+             xmlns="http://java.sun.com/xml/ns/persistence" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="http://java.sun.com/xml/ns/persistence http://java.sun.com/xml/ns/persistence/persistence_2_0.xsd">
+
+    <!-- Oracle for Integration and Production -->
+    <persistence-unit name="job-man-vu-pu" transaction-type="RESOURCE_LOCAL">
+        <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
+
+        <class>pl.newicom.jobman.view.sql.ViewMetaData</class>
+        <class>pl.newicom.jobman.view.sql.schedule.JobScheduleEntry</class>
+        <class>pl.newicom.jobman.view.sql.execution.JobExecutionEntry</class>
+        <class>pl.newicom.jobman.view.sql.progress.JobProgressEntry</class>
+        <class>pl.newicom.jobman.view.sql.JobHeader</class>
+
+        <exclude-unlisted-classes>false</exclude-unlisted-classes>
+
+        <properties>
+            <property name="hibernate.show_sql" value="true" />
+            <property name="hibernate.dialect" value="${jm.viewStore.sql.hibernate.dialect}" />
+
+            <property name="hibernate.connection.provider_class" value="com.zaxxer.hikari.hibernate.HikariConnectionProvider"/>
+            <property name="hibernate.hikari.poolName" value="jm" />
+            <property name="hibernate.hikari.minimumIdle" value="5" />
+            <property name="hibernate.hikari.maximumPoolSize" value="30" />
+            <property name="hibernate.hikari.idleTimeout" value="30000" />
+            <property name="hibernate.hikari.dataSourceClassName" value="${jm.viewStore.sql.dataSourceClassName}" />
+            
+            <property name="hibernate.jdbc.batch_size" value="10"/>
+            <property name="hibernate.order_inserts" value="true"/>
+
+            <property name="hibernate.hikari.leakDetectionThreshold" value="100000" />
+            
+            <property name="hibernate.hikari.dataSource.url" value="${jm.viewStore.url}" />
+            <property name="hibernate.hikari.dataSource.user" value="${jm.viewStore.user}" />
+            <property name="hibernate.hikari.dataSource.password" value="${jm.viewStore.password}" />
+        </properties>
+
+    </persistence-unit>
+</persistence>

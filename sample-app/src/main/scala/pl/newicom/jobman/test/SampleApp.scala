@@ -3,6 +3,7 @@ package pl.newicom.jobman.test
 import java.io.{File, FileInputStream}
 import java.lang.String.format
 
+import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{ActorIdentity, ActorPath, ActorSystem, Identify, Props}
 import akka.cluster.Cluster
 import akka.persistence.journal.leveldb.{SharedLeveldbJournal, SharedLeveldbStore}
@@ -11,10 +12,16 @@ import com.typesafe.config.ConfigFactory
 import com.typesafe.config.ConfigFactory.parseFileAnySyntax
 import org.apache.log4j.PropertyConfigurator
 import org.slf4j.LoggerFactory
-import pl.newicom.jobman.JobManInfraServices
+import pl.newicom.jobman.execution.{JobExecution, JobExecutionJournalId}
+import pl.newicom.jobman.execution.cluster.WorkerOffice.workerOffice
+import pl.newicom.jobman.notification.{Notification, NotificationJournalId}
+import pl.newicom.jobman.schedule.{DefaultJobSchedulingPolicy, JobScheduling, JobSchedulingJournalId}
+import pl.newicom.jobman.test.ClusterSingletonFactory.clusterSingleton
+import pl.newicom.jobman.test.notification.{TestJobNotificationHandler, TestJobNotificationMessageFactory}
+import pl.newicom.jobman.{JobMan, JobManInfraServices}
 
-import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 object SampleApp {
@@ -30,9 +37,19 @@ object SampleApp {
 
     startupSharedJournal(system, startStore = port == "2551", path = ActorPath.fromString("akka.tcp://jm@127.0.0.1:2551/user/store"))
 
-    new JobManInfraServices(cluster, config)(system)
+    implicit val jm: JobMan = new JobManInfraServices(cluster, config)(system)
 
-    cluster.registerOnMemberUp {}
+    cluster.registerOnMemberUp {
+      implicit val ec: ExecutionContext = system.dispatcher
+      val as                            = system.toTyped
+      clusterSingleton(as, JobSchedulingJournalId, JobScheduling.behavior(new DefaultJobSchedulingPolicy))
+      clusterSingleton(as,
+                       NotificationJournalId,
+                       Notification.behavior(new TestJobNotificationMessageFactory(), new TestJobNotificationHandler()))
+      clusterSingleton(as, JobExecutionJournalId, JobExecution.behavior)
+
+      workerOffice(new TestJobHandlerProvider, jm.config.maxShards)
+    }
 
     getLogger.info("OK")
   }

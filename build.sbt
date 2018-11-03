@@ -20,7 +20,7 @@ licenses          in ThisBuild := ("MIT", new URL("http://raw.githubusercontent.
 sonatypeProfileName := "pl.newicom"
 
 lazy val root = (project in file("."))
-  .aggregate(`job-man-api`, `job-scheduling-policy`, `job-man-core`, `job-man-rest`, `sample-app`)
+  .aggregate(`job-man-api`, `job-scheduling-policy`, `job-man-core`, `job-man-view-sql`, `job-man-rest`, `sample-app`)
   .settings(
     commonSettings,
     publishArtifact := false
@@ -43,6 +43,12 @@ lazy val `job-man-core` = project
     commonSettings,
     libraryDependencies ++= Seq(Akka.persistenceTyped, Akka.persistenceQuery, Akka.streamTyped, Akka.clusterShardingTyped, Akka.slf4j, scalaTest % "test")
   ).dependsOn(`job-scheduling-policy`)
+
+lazy val `job-man-view-sql` = project
+  .settings(
+    commonSettings,
+    libraryDependencies ++= Hibernate() ++ Seq(slf4j_log4j, Akka.streamTyped, Akka.persistenceQuery, Akka.clusterTools)
+  ).dependsOn(`job-man-api`)
 
 lazy val `job-man-rest` = project
   .settings(

@@ -1,6 +1,5 @@
 package pl.newicom.jobman.schedule
 
-import akka.actor.ActorRef
 import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.persistence.typed.scaladsl.{Effect, PersistentBehaviors}
@@ -18,8 +17,6 @@ import pl.newicom.jobman.shared.command._
 import pl.newicom.jobman.shared.event.ExecutionJournalOffsetChanged
 
 object JobScheduling {
-
-  val JobSchedulingJournalId = "JobSchedule"
 
   def behavior(policy: JobSchedulingPolicy)(implicit jm: JobMan): Behavior[JobScheduleCommand] =
     Behaviors.setup(ctx => {

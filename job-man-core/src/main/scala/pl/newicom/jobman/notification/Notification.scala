@@ -24,7 +24,6 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 object Notification {
-  val NotificationJournalId = "Notification"
 
   val checkoutInterval: FiniteDuration = 1.minutes
   val cacheAskTimeout: FiniteDuration  = 3.seconds
