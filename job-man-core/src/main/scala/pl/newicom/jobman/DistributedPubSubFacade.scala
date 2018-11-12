@@ -4,7 +4,7 @@ import akka.actor.ActorRef
 import akka.actor.typed.scaladsl.adapter._
 import akka.cluster.pubsub.DistributedPubSubMediator
 
-class DistributedPubSubFacade(mediator: ActorRef) {
+class DistributedPubSubFacade(val mediator: ActorRef) {
 
   def subscribe(topic: String, ref: akka.actor.typed.ActorRef[_]): Unit =
     subscribe(topic, ref.toUntyped)

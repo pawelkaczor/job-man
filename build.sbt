@@ -60,7 +60,7 @@ lazy val `sample-app` = project
   .settings(
     commonSettings,
     libraryDependencies ++= Jackson() ++ levelDB ++ Seq(slf4j_log4j, scalaTest % "test")
-  ).dependsOn(`job-man-core`, `job-man-rest`)
+  ).dependsOn(`job-man-core`, `job-man-rest`, `job-man-view-sql`)
 
 lazy val commonSettings: Seq[Setting[_]] = Publish.settings ++ Seq(
   licenses := Seq("MIT" -> url("http://raw.github.com/pawelkaczor/job-man/master/LICENSE.md")),

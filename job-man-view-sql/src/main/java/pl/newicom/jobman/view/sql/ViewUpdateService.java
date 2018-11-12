@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 
+import akka.actor.ActorRef;
 import akka.actor.typed.ActorContext;
 import akka.actor.typed.Behavior;
 import akka.persistence.query.javadsl.EventsByPersistenceIdQuery;
@@ -56,10 +57,10 @@ public class ViewUpdateService {
 		);
 	}
 
-	public static Behavior<ViewUpdateServiceCommand> viewUpdateService(DistributedPubSubFacade pubSub, Function<String, ActorMaterializer> actorMaterializerProvider, EventsByPersistenceIdQuery readJournal) {
+	public static Behavior<ViewUpdateServiceCommand> viewUpdateService(ActorRef pubSubMediator, Function<String, ActorMaterializer> actorMaterializerProvider, EventsByPersistenceIdQuery readJournal) {
 		Processor mdProcessor = getProcessor("md");
 		return setup(context -> {
-			startProgressViewUpdate(pubSub, context);
+			startProgressViewUpdate(new DistributedPubSubFacade(pubSubMediator), context);
 
 			projections().forEach(p -> context.getSelf().tell(new StartProjection(p)));
 

@@ -9,8 +9,6 @@ import akka.cluster.Cluster
 import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.sharding.typed.ClusterShardingSettings
 import akka.cluster.sharding.typed.scaladsl.ClusterSharding
-import akka.persistence.query.PersistenceQuery
-import akka.persistence.query.journal.leveldb.scaladsl.LeveldbReadJournal
 import akka.persistence.query.scaladsl.EventsByPersistenceIdQuery
 import akka.stream.typed.scaladsl
 import akka.stream.{ActorMaterializer, ActorMaterializerSettings, Supervision}
@@ -21,7 +19,6 @@ import pl.newicom.jobman.JobManInfraServices._
 import pl.newicom.jobman.cache.{JobCache, ReplicatedCache}
 import pl.newicom.jobman.execution.JobExecutionConfig
 import pl.newicom.jobman.schedule.JobSchedulingConfig
-
 import scala.collection.JavaConverters._
 
 object JobManInfraServices {
@@ -56,7 +53,8 @@ object JobManInfraServices {
   }
 }
 
-class JobManInfraServices(cluster: Cluster, _config: Config)(implicit as: ActorSystem) extends JobMan {
+class JobManInfraServices(cluster: Cluster, _config: Config, val readJournal: EventsByPersistenceIdQuery)(implicit as: ActorSystem)
+    extends JobMan {
 
   lazy val jobConfigRegistry: JobConfigRegistry = {
     def jobConfig(c: Config): JobConfig =
@@ -121,6 +119,4 @@ class JobManInfraServices(cluster: Cluster, _config: Config)(implicit as: ActorS
     as.actorOf(JobCache.props(replicatedCache), "JobCache")
   }
 
-  lazy val readJournal: EventsByPersistenceIdQuery =
-    PersistenceQuery(as).readJournalFor[LeveldbReadJournal](LeveldbReadJournal.Identifier)
 }
