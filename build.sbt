@@ -20,7 +20,7 @@ licenses          in ThisBuild := ("MIT", new URL("http://raw.githubusercontent.
 sonatypeProfileName := "pl.newicom"
 
 lazy val root = (project in file("."))
-  .aggregate(`job-man-api`, `job-scheduling-policy`, `job-man-core`, `job-man-view-sql`, `job-man-rest`, `sample-app`)
+  .aggregate(`job-man-api`, `job-scheduling-policy`, `job-man-core`, `job-man-view-sql`, `job-man-rest`, `demo-app`)
   .settings(
     commonSettings,
     publishArtifact := false
@@ -56,7 +56,7 @@ lazy val `job-man-rest` = project
     libraryDependencies ++= Seq(AkkaHttp.httpCore, AkkaHttp.jackson)
   ).dependsOn(`job-man-api`)
 
-lazy val `sample-app` = project
+lazy val `demo-app` = project
   .settings(
     commonSettings,
     libraryDependencies ++= Jackson() ++ SqlDb() ++ levelDB ++ Seq(slf4j_log4j, scalaTest % "test")
