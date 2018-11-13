@@ -97,7 +97,7 @@ public class JobExecutionStatisticsPublisher {
 	private static Source<JobProgressUpdated, NotUsed> jobProgressUpdates(JobMan jm) {
 		return Source.actorRef(100, OverflowStrategy.dropHead())
 				.mapMaterializedValue(ref -> {
-					jm.distributedPubSub().subscribe(package$.MODULE$.ProgressTopic(), ref);
+					jm.distributedPubSub().subscribe(ProgressTopic.Name(), ref);
 					return NotUsed.getInstance();
 				}).filter(e -> e instanceof JobProgressUpdated).map(e -> (JobProgressUpdated)e);
 
@@ -118,7 +118,7 @@ public class JobExecutionStatisticsPublisher {
 
 	private static Sink<JobExecutionStatisticsEvent, CompletionStage<Done>> jobProgressPublisher(JobMan jobMan) {
 		DistributedPubSubFacade pubSub = jobMan.distributedPubSub();
-		return Sink.foreach(msg -> pubSub.publish(package$.MODULE$.ProgressTopic(), msg));
+		return Sink.foreach(msg -> pubSub.publish(ProgressTopic.Name(), msg));
 	}
 
 }

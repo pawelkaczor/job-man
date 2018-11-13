@@ -17,6 +17,6 @@ class JobProgressPublisher(jobId: String, jobExecutionId: String, pubSub: Distri
     publish(JobProgressUpdated(jobId, jobExecutionId, nrOfTasksDiff, now))
 
   private def publish(event: AnyRef): Unit =
-    pubSub.publish(ProgressTopic, event)
+    pubSub.publish(ProgressTopic.Name, event)
 
 }

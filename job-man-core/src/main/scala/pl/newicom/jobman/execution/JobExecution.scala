@@ -49,7 +49,7 @@ object JobExecution {
           }
 
         jm.distributedPubSub.subscribe(HealthCheckTopic, ctx.spawn(queueTermination, "QueueTerminationReporter"))
-        jm.distributedPubSub.subscribe(ProgressTopic, ctx.spawn(jobActivityConfirmation, "JobActivityConfirmer"))
+        jm.distributedPubSub.subscribe(ProgressTopic.Name, ctx.spawn(jobActivityConfirmation, "JobActivityConfirmer"))
 
         PersistentBehaviors
           .receive(

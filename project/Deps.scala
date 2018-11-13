@@ -60,7 +60,7 @@ object Deps {
   object Hibernate {
     val hibernateCore          = "org.hibernate"                   % "hibernate-core"          % "4.3.11.Final"
     val hibernateEntityManager = "org.hibernate"                   % "hibernate-entitymanager" % "4.3.11.Final"
-    val hibernateJPA           = "org.hibernate.javax.persistence" % "hibernate-jpa-2.0-api"   % "1.0.1.Final"
+    val hibernateJPA           = "org.hibernate.javax.persistence" % "hibernate-jpa-2.1-api"   % "1.0.0.Final"
 
     def apply() = Seq(hibernateCore, hibernateEntityManager, hibernateJPA)
   }

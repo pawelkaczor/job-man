@@ -20,10 +20,10 @@ import akka.stream.ActorMaterializer;
 import akka.stream.javadsl.Sink;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import pl.newicom.jobman.progress.ProgressTopic;
 import pl.newicom.jobman.progress.event.JobProgressEvent;
 import pl.newicom.jobman.progress.event.JobProgressUpdated;
 import pl.newicom.jobman.progress.event.JobRemainingTimeUpdated;
-import pl.newicom.jobman.progress.package$;
 import pl.newicom.jobman.view.sql.command.StartProjection;
 import pl.newicom.jobman.view.sql.command.Stop;
 import pl.newicom.jobman.view.sql.command.ViewUpdateServiceCommand;
@@ -81,7 +81,7 @@ public class ViewUpdateService {
 	}
 
 	private static void startProgressViewUpdate(DistributedPubSubFacade pubSub, ActorContext<ViewUpdateServiceCommand> ctx) {
-		pubSub.subscribe(package$.MODULE$.ProgressTopicName(), createProgressUpdater(ctx));
+		pubSub.subscribe(ProgressTopic.Name(), createProgressUpdater(ctx));
 	}
 
 	@SuppressWarnings("unchecked")
