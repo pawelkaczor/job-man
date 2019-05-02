@@ -5,7 +5,7 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.actor.typed.scaladsl.ActorContext
 import akka.event.Logging
 import akka.persistence.typed.scaladsl.Effect
-import akka.persistence.typed.scaladsl.PersistentBehaviors.CommandHandler
+import akka.persistence.typed.scaladsl.EventSourcedBehavior.CommandHandler
 import pl.newicom.jobman.shared.event.SubscriptionOffsetChangedEvent
 
 abstract class EventSourcedCommandHandler[C, E, S](ctx: ActorContext[C], eventHandler: (S, E) => S) extends CommandHandler[C, E, S] {

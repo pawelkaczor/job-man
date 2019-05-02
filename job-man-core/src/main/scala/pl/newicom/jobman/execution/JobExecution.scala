@@ -7,7 +7,8 @@ import akka.NotUsed
 import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.ActorContext
 import akka.actor.typed.scaladsl.Behaviors.{receiveMessage, same, setup, withTimers}
-import akka.persistence.typed.scaladsl.{Effect, PersistentBehaviors}
+import akka.persistence.typed.PersistenceId
+import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior}
 import akka.stream.scaladsl.{Sink, Source}
 import akka.stream.typed.scaladsl.ActorSink
 import pl.newicom.jobman._
@@ -51,14 +52,12 @@ object JobExecution {
         jm.distributedPubSub.subscribe(HealthCheckTopic, ctx.spawn(queueTermination, "QueueTerminationReporter"))
         jm.distributedPubSub.subscribe(ProgressTopic.Name, ctx.spawn(jobActivityConfirmation, "JobActivityConfirmer"))
 
-        PersistentBehaviors
-          .receive(
-            persistenceId = JobExecutionJournalId,
-            emptyState = JobExecutionState(jm.jobConfigRegistry),
-            commandHandler = new JobExecutionCommandHandler(ctx, eventHandler),
-            eventHandler
-          )
-          .onRecoveryCompleted(recoveryHandler(ctx))
+        EventSourcedBehavior(
+          persistenceId = PersistenceId(JobExecutionJournalId),
+          emptyState = JobExecutionState(jm.jobConfigRegistry),
+          commandHandler = new JobExecutionCommandHandler(ctx, eventHandler),
+          eventHandler
+        ).onRecoveryCompleted(recoveryHandler(ctx))
           .snapshotEvery(jm.config.journalSnapshotInterval)
       })
     })
@@ -125,7 +124,7 @@ class JobExecutionCommandHandler(ctx: ActorContext[JobExecutionCommand], eventHa
 
       case cmd @ (Stop | StopDueToEventSubsriptionTermination(_)) =>
         logger.info("{} received. Stopping Job Execution at schedulingJournalOffset: {}", cmd, state.schedulingJournalOffset)
-        Effect.stop
+        Effect.stop()
 
     }
 

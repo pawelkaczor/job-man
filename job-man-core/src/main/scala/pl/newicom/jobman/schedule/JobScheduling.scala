@@ -2,7 +2,7 @@ package pl.newicom.jobman.schedule
 
 import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
-import akka.persistence.typed.scaladsl.{Effect, PersistentBehaviors}
+import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior}
 import akka.stream.typed.scaladsl.ActorSink
 import pl.newicom.jobman._
 import pl.newicom.jobman.cache.JobCache.AddJob
@@ -15,6 +15,9 @@ import pl.newicom.jobman.schedule.error.{JobAlreadyDispatchedForExecution, JobNo
 import pl.newicom.jobman.schedule.event._
 import pl.newicom.jobman.shared.command._
 import pl.newicom.jobman.shared.event.ExecutionJournalOffsetChanged
+import akka.stream.scaladsl.Sink
+import akka.NotUsed
+import akka.persistence.typed.PersistenceId
 
 object JobScheduling {
 
@@ -23,20 +26,16 @@ object JobScheduling {
 
       def recoveryHandler(schedule: JobScheduleState): Unit = {
         ctx.log.info("Job Scheduling resumed from executionJournalOffset: {}", schedule.executionJournalOffset)
-
-        jobExecutionReportSource(schedule.executionJournalOffset).runWith {
-          ActorSink.actorRef(ctx.self, Stop, StopDueToEventSubsriptionTermination)
-        }(jm.actorMaterializer("Job Scheduling service failure"))
+        val sink: Sink[JobExecutionReport, NotUsed] = ActorSink.actorRef(ctx.self, Stop, StopDueToEventSubsriptionTermination)
+        jobExecutionReportSource(schedule.executionJournalOffset).runWith(sink)(jm.actorMaterializer("Job Scheduling service failure"))
       }
 
-      PersistentBehaviors
-        .receive(
-          persistenceId = JobSchedulingJournalId,
-          emptyState = JobScheduleState(),
-          commandHandler = new JobSchedulingCommandHandler(ctx, policy, jm.config.schedulingConfig, eventHandler),
-          eventHandler
-        )
-        .onRecoveryCompleted(recoveryHandler)
+      EventSourcedBehavior(
+        persistenceId = PersistenceId(JobSchedulingJournalId),
+        emptyState = JobScheduleState(),
+        commandHandler = new JobSchedulingCommandHandler(ctx, policy, jm.config.schedulingConfig, eventHandler),
+        eventHandler
+      ).onRecoveryCompleted(recoveryHandler)
         .snapshotEvery(jm.config.journalSnapshotInterval)
     })
 
@@ -100,7 +99,7 @@ class JobSchedulingCommandHandler(ctx: ActorContext[JobScheduleCommand],
 
       case cmd @ (Stop | StopDueToEventSubsriptionTermination(_)) =>
         logger.info("{} received. Stopping Job Scheduling. Number of jobs in the schedule {}", cmd, schedule.jobsNumber)
-        Effect.stop
+        Effect.stop()
     }
 
   def jobScheduled(job: Job, schedule: State, config: JobSchedulingConfig): List[Event] =

@@ -13,8 +13,8 @@ import java.util.Optional;
 import java.util.function.Function;
 
 import akka.actor.ActorRef;
-import akka.actor.typed.ActorContext;
 import akka.actor.typed.Behavior;
+import akka.actor.typed.javadsl.ActorContext;
 import akka.persistence.query.javadsl.EventsByPersistenceIdQuery;
 import akka.stream.ActorMaterializer;
 import akka.stream.javadsl.Sink;

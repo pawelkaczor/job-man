@@ -4,7 +4,8 @@ import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.ActorContext
 import akka.actor.typed.scaladsl.Behaviors.{setup, withTimers}
 import akka.pattern.ask
-import akka.persistence.typed.scaladsl.{Effect, PersistentBehaviors}
+import akka.persistence.typed.PersistenceId
+import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior}
 import akka.stream.typed.scaladsl.ActorSink
 import akka.util.Timeout
 import pl.newicom.jobman.cache.JobCache.{GetJob, JobFound, RemoveJob}
@@ -59,14 +60,12 @@ object Notification {
             }(jm.actorMaterializer("Notification service failure"))
         }
 
-        PersistentBehaviors
-          .receive(
-            persistenceId = NotificationJournalId,
-            emptyState = NotificationState(),
-            commandHandler = new NotificationCommandHandler(ctx, eventHandler, jobNotificationHandler, jobNotificationMessageFactory),
-            eventHandler = eventHandler
-          )
-          .onRecoveryCompleted(recoveryHandler)
+        EventSourcedBehavior(
+          persistenceId = PersistenceId(NotificationJournalId),
+          emptyState = NotificationState(),
+          commandHandler = new NotificationCommandHandler(ctx, eventHandler, jobNotificationHandler, jobNotificationMessageFactory),
+          eventHandler = eventHandler
+        ).onRecoveryCompleted(recoveryHandler)
           .snapshotEvery(jm.config.journalSnapshotInterval)
       })
     })
@@ -103,7 +102,7 @@ class NotificationCommandHandler(ctx: ActorContext[NotificationCommand],
 
     case cmd @ (Stop | StopDueToEventSubsriptionTermination(_)) =>
       logger.info("{} received. Stopping Notification Service at executionJournalOffset: {}", cmd, state.executionJournalOffset)
-      Effect.stop
+      Effect.stop()
 
   }
 

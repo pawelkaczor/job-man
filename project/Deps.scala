@@ -3,8 +3,8 @@ import sbt._
 object Deps {
 
   object Version {
-    val Akka     = "2.5.17"
-    val AkkaHttp = "10.1.5"
+    val Akka     = "2.5.21"
+    val AkkaHttp = "10.1.7"
 
     val Jackson = "2.9.6"
 
