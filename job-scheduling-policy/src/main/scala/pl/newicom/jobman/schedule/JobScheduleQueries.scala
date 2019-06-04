@@ -48,4 +48,7 @@ trait JobScheduleQueries {
 
   def jobsNumber: Int =
     queues.values.flatten.size + waitingList.size
+
+  def jobs: Set[Job] =
+    (queues.values.flatten.map(_.job) ++ waitingList).toSet
 }

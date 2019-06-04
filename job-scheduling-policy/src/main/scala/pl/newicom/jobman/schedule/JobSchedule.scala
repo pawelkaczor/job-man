@@ -1,7 +1,6 @@
 package pl.newicom.jobman.schedule
 
 import pl.newicom.jobman.schedule.JobSchedule._
-import pl.newicom.jobman.schedule.event.{EquivalentJobFound, JobAddedToWaitingList, JobScheduleEntryAdded, JobSchedulingResult}
 import pl.newicom.jobman.{Job, JobParameters, JobType}
 
 object JobSchedule {

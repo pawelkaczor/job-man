@@ -26,6 +26,8 @@ object JobScheduling {
 
       def recoveryHandler(schedule: JobScheduleState): Unit = {
         ctx.log.info("Job Scheduling resumed from executionJournalOffset: {}", schedule.executionJournalOffset)
+        schedule.jobs.foreach(job => jm.jobCache ! AddJob(job.id, job.params))
+
         val sink: Sink[JobExecutionReport, NotUsed] = ActorSink.actorRef(ctx.self, Stop, StopDueToEventSubsriptionTermination)
         jobExecutionReportSource(schedule.executionJournalOffset).runWith(sink)(jm.actorMaterializer("Job Scheduling service failure"))
       }
@@ -57,12 +59,10 @@ class JobSchedulingCommandHandler(ctx: ActorContext[JobScheduleCommand],
     command match {
 
       case cmd @ ScheduleJob(job, _) =>
+        jm.jobCache ! AddJob(job.id, job.params)
         persist(jobScheduled(job, schedule, config)).thenForEachRun {
           case result: JobSchedulingResult =>
             cmd.replyTo ! result
-            if (result.isInstanceOf[JobAccepted]) {
-              jm.jobCache ! AddJob(job.id, job.params)
-            }
         }
 
       case cmd @ CancelJob(jobId, _) =>
