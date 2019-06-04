@@ -5,9 +5,6 @@ import java.io.{PrintWriter, StringWriter}
 import pl.newicom.jobman.JobType
 
 trait JobFailure extends JobResult {
-  def jobId: String
-  def jobType: JobType
-  def report: String
 
   override def isSuccess: Boolean = false
 }

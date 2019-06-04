@@ -43,15 +43,7 @@ public class JobExecutionProjection extends AbstractProjection<JobExecutionEvent
 		return entry -> entry.setJobExecutionStatus(status);
 	}
 
-	private Consumer<JobExecutionEntry> endDateUpdate(JobEnded event) {
-		return entry -> entry.setJobEndDate(toDateTime(event.dateTime()));
-	}
-
-	private Consumer<JobExecutionEntry> endDateUpdate(JobExpired event) {
-		return entry -> entry.setJobEndDate(toDateTime(event.dateTime()));
-	}
-
-	private Consumer<JobExecutionEntry> endDateUpdate(JobTerminated event) {
+	private Consumer<JobExecutionEntry> endDateUpdate(JobExecutionTerminalEvent event) {
 		return entry -> entry.setJobEndDate(toDateTime(event.dateTime()));
 	}
 
